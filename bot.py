@@ -21,7 +21,7 @@ ENV_KEYS = {
 
 # Setup Firebase database
 firebase_admin.initialize_app(
-    credentials.Certificate(ENV_KEYS),
+    firebase_admin.credentials.Certificate(ENV_KEYS),
     {'databaseURL': environ["FIREBASE_DATABASE_URL"]}
 )
 
