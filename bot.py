@@ -49,13 +49,13 @@ def echo(update, context):
 def record(update, context):
     """Logs message into database."""
     ref = db.reference(str(update.effective_chat.id))
-    ref.set({"message": update.message.text})
+    ref.set({"message": ' '.join(context.args)})
 
 def error(update, context):
     """Log Errors caused by Updates."""
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
-def main():
+def main(webhook_flag = True):
     """Start the bot."""
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
@@ -77,12 +77,16 @@ def main():
     dp.add_error_handler(error)
 
     # Start the Bot
-    updater.start_webhook(
-        listen="0.0.0.0",
-        port=int(PORT),
-        url_path=TOKEN,
-        webhook_url='https://' + NAME + '.herokuapp.com/' + TOKEN
-    )
+    if webhook_flag:
+        updater.start_webhook(
+            listen="0.0.0.0",
+            port=int(PORT),
+            url_path=TOKEN,
+            webhook_url='https://' + NAME + '.herokuapp.com/' + TOKEN
+        )
+    else:
+        # For local development purposes
+        updater.start_polling()
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
