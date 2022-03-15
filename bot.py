@@ -32,7 +32,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-NAME, USAGE, SLOTS, CAR = range(4)
+REG_NAME, REG_USAGE, REG_SLOTS, REG_CAR = range(4)
 
 # Define a few command handlers. These usually take the two arguments update and
 # context. Error handlers also receive the raised TelegramError object in error.
@@ -66,13 +66,13 @@ def main(webhook_flag = True):
     reg_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('registro', actions.register)],
         states={
-            NAME: [MessageHandler(Filters.text & ~Filters.command, actions.register_name)],
-            USAGE: [MessageHandler(Filters.regex('^(Conduzco|Pido coche)$'),
+            REG_NAME: [MessageHandler(Filters.text & ~Filters.command, actions.register_name)],
+            REG_USAGE: [MessageHandler(Filters.regex('^(Conduzco|Pido coche)$'),
                                     actions.register_usage)],
-            SLOTS: [
+            REG_SLOTS: [
                 MessageHandler(Filters.regex('^(1|2|3|4|5|6)$'), actions.register_slots),
             ],
-            CAR: [MessageHandler(Filters.text & ~Filters.command, actions.register_car)],
+            REG_CAR: [MessageHandler(Filters.text & ~Filters.command, actions.register_car)],
         },
         fallbacks=[CommandHandler('cancelar', actions.register_cancel)],
     )

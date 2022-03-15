@@ -3,7 +3,7 @@ from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
 from firebase_admin import db
 
-NAME, USAGE, SLOTS, CAR = range(4)
+REG_NAME, REG_USAGE, REG_SLOTS, REG_CAR = range(4)
 
 def start(update, context):
     if update.message.chat.type == "private":
@@ -34,7 +34,7 @@ def register(update, context):
             "demás usuarios.")
     update.message.reply_text(text)
 
-    return NAME
+    return REG_NAME
 
 def register_name(update, context):
     """Stores username into DB and asks for their typical usage"""
@@ -48,7 +48,7 @@ def register_name(update, context):
         reply_keyboard, one_time_keyboard=True, input_field_placeholder='Normalmente...'
     ))
 
-    return USAGE
+    return REG_USAGE
 
 def register_usage(update, context):
     """Stores user typical usage into DB and continues conversation if necessary"""
@@ -58,7 +58,7 @@ def register_usage(update, context):
         update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(
             reply_keyboard, one_time_keyboard=True,
             input_field_placeholder='Número de asientos'))
-        return SLOTS
+        return REG_SLOTS
     else:
         text = "Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
         update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
@@ -73,7 +73,7 @@ def register_slots(update, context):
             "los pasajeros reconocerlo cuando los recojas.")
     update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
 
-    return CAR
+    return REG_CAR
 
 def register_car(update, context):
     """Stores user car into DB and ends the conversation"""
