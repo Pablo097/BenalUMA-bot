@@ -1,7 +1,7 @@
 import logging
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
-from firebase_admin import db
+from data.database_api import add_user, add_driver, is_registered
 
 REG_NAME, REG_USAGE, REG_SLOTS, REG_CAR = range(4)
 
@@ -19,7 +19,10 @@ def help(update, context):
     if update.message.chat.type == "private":
         text = "Comandos disponibles:"
 
-        text += "\n🖊 /registro - Comienza a usar BenalUMA registrándote en el sistema."
+        if is_registered(update.effective_chat.id):
+            text += "\nNo hay ayuda aún."
+        else:
+            text += "\n🖊 /registro - Comienza a usar BenalUMA registrándote en el sistema."
 
         update.message.reply_text(text)
     else:
@@ -27,23 +30,26 @@ def help(update, context):
 
 def register(update, context):
     """Starts the register conversation process"""
-    text = ("Antes de registrarte, asegúrate de unirte al grupo de BenalUMA "
-            "y conocer las normas de uso. Envía /cancelar para cancelar el registro.")
-    update.message.reply_text(text)
-    text = ("Introduzca su nombre y apellidos, los cuales serán mostrados a los "
-            "demás usuarios.")
-    update.message.reply_text(text)
-
-    return REG_NAME
+    if is_registered(update.effective_chat.id):
+        text = "Ya te has registrado en el sistema."
+        update.message.reply_text(text)
+        return ConversationHandler.END
+    else:
+        text = ("Antes de registrarte, asegúrate de unirte al grupo de BenalUMA "
+                "y conocer las normas de uso. Envía /cancelar para cancelar el registro.")
+        update.message.reply_text(text)
+        text = ("Introduzca su nombre y apellidos, los cuales serán mostrados a los "
+                "demás usuarios.")
+        update.message.reply_text(text)
+        return REG_NAME
 
 def register_name(update, context):
     """Stores username into DB and asks for their typical usage"""
-    ref = db.reference('/Users/'+str(update.effective_chat.id))
-    ref.set({"name": update.message.text})
+    add_user(update.effective_chat.id, update.message.text)
 
-    reply_keyboard = [["Conduzco", "Pido coche"]]
+    reply_keyboard = [["Conduzco"], ["Pido coche"]]
     text = ("Tu nombre ha sido guardado con éxito."
-            "\n\nIndica ahora si normalmente llevas o pides coche.")
+            "\nIndica ahora si normalmente llevas o pides coche.")
     update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(
         reply_keyboard, one_time_keyboard=True, input_field_placeholder='Normalmente...'
     ))
@@ -51,9 +57,9 @@ def register_name(update, context):
     return REG_USAGE
 
 def register_usage(update, context):
-    """Stores user typical usage into DB and continues conversation if necessary"""
+    """Checks user typical usage and continues conversation if necessary"""
     if update.message.text == 'Conduzco':
-        reply_keyboard = [list(range(1,6,1))]
+        reply_keyboard = [[1,2,3], [4,5,6]]
         text = "Indica ahora cuántos asientos disponibles sueles ofertar."
         update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(
             reply_keyboard, one_time_keyboard=True,
@@ -65,9 +71,8 @@ def register_usage(update, context):
         return ConversationHandler.END
 
 def register_slots(update, context):
-    """Stores user slots into DB and continues conversation"""
-    ref = db.reference('/Drivers/'+str(update.effective_chat.id))
-    ref.set({"slots": str(update.message.text)})
+    """Stores user slots and continues conversation"""
+    context.user_data['slots'] = update.message.text
 
     text = ("Finalmente, indica el modelo y color de tu coche para facilitar a "
             "los pasajeros reconocerlo cuando los recojas.")
@@ -76,9 +81,11 @@ def register_slots(update, context):
     return REG_CAR
 
 def register_car(update, context):
-    """Stores user car into DB and ends the conversation"""
-    ref = db.reference('/Drivers/'+str(update.effective_chat.id))
-    ref.update({"car": update.message.text})
+    """Stores driver info into DB and ends the conversation"""
+    slots = context.user_data['slots']
+    car = update.message.text
+    context.user_data.clear()
+    add_driver(update.effective_chat.id, slots, car)
 
     text = "Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
     update.message.reply_text(text)
