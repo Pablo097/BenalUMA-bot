@@ -152,6 +152,9 @@ def delete_driver(chat_id):
     """
 
     db.reference('/Drivers/'+str(chat_id)).delete()
+    # TODO: Delete all possible planned trips
+    # (inside delete_trip function, alert possible passengers that the
+    # trip has been cancelled)
 
 def get_slots(chat_id):
     """Gets the number of slots of a driver.
@@ -241,7 +244,11 @@ def get_fee(chat_id):
     """
 
     ref = db.reference('/Drivers/'+str(chat_id))
-    return float(ref.child('Fee').get())
+    fee = ref.child('Fee').get()
+    if fee != None:
+        return float(fee)
+    else:
+        return None
 
 def set_fee(chat_id, fee):
     """Sets the per-user payment quantity for a driver.
@@ -277,10 +284,13 @@ def get_bizum(chat_id):
     """
 
     ref = db.reference('/Drivers/'+str(chat_id))
-    if ref.child('Bizum').get() == 'Si':
+    bizum = ref.child('Bizum').get()
+    if bizum == 'Yes':
         return True
-    else:
+    elif bizum == 'No':
         return False
+
+    return None
 
 def set_bizum(chat_id, bizum_pref):
     """Sets the Bizum preference a driver.
@@ -300,7 +310,7 @@ def set_bizum(chat_id, bizum_pref):
 
     ref = db.reference('/Drivers/'+str(chat_id))
     if bizum_pref:
-        ref.update({"Bizum": "Si"})
+        ref.update({"Bizum": "Yes"})
     else:
         ref.update({"Bizum": "No"})
 

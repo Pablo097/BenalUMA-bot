@@ -18,5 +18,6 @@ def config_keyboard(chat_id):
                 InlineKeyboardButton("Establecer precio", callback_data="CONFIG_FEE"),
             ]
         ]
-    keyboard += [[InlineKeyboardButton("Terminar", callback_data="CONFIG_END")]]
+    keyboard += [[InlineKeyboardButton("Configuración avanzada", callback_data="CONFIG_ADVANCED")],
+                 [InlineKeyboardButton("Terminar", callback_data="CONFIG_END")]]
     return InlineKeyboardMarkup(keyboard)

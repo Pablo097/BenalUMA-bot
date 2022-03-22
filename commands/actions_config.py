@@ -1,13 +1,18 @@
 import logging
+import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
-from data.database_api import is_registered, is_driver, set_name, set_car, set_slots, set_bizum, set_fee
+from telegram.utils.helpers import escape_markdown
+from data.database_api import (is_registered, is_driver, set_name, set_car,
+                                set_slots, set_bizum, set_fee, add_driver,
+                                delete_driver, delete_user)
 from utils.keyboards import config_keyboard
 from utils.common import *
 import re
 
-CONFIG_SELECT, CHANGING_MESSAGE, CHANGING_SLOTS, CHANGING_BIZUM = range(4)
+(CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE,
+    CHANGING_SLOTS, CHANGING_BIZUM, CHOOSING_ADVANCED_OPTION) = range(6)
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +21,11 @@ def config(update, context):
     if is_registered(update.effective_chat.id):
         reply_markup = config_keyboard(update.effective_chat.id)
 
-        text = "Aquí puedes modificar la configuración asociada a tu cuenta."
-        update.message.reply_text(text, reply_markup=reply_markup)
+        text = "Aquí puedes modificar la configuración asociada a tu cuenta\."
+        text += "\n\n Esta es tu configuración actual: \n"
+        text += get_formatted_user_config(update.effective_chat.id) + "\n"
+        update.message.reply_text(text, reply_markup=reply_markup,
+                                  parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return CONFIG_SELECT
     else:
         text = "Antes de poder usar este comando debes registrarte con el comando /registro."
@@ -30,15 +38,41 @@ def config_restart(update, context):
     query.answer()
     reply_markup = config_keyboard(update.effective_chat.id)
 
-    text = "Puedes seguir cambiando ajustes."
-    query.edit_message_text(text, reply_markup=reply_markup)
+    text = "Esta es tu configuración actual: \n"
+    text += get_formatted_user_config(update.effective_chat.id) + "\n\n"
+    text += "Puedes seguir cambiando ajustes\."
+    query.edit_message_text(text, reply_markup=reply_markup,
+                            parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return CONFIG_SELECT
+
+def config_select_advanced(update, context):
+    """Gives advanced options for changing the user configuration"""
+    query = update.callback_query
+    query.answer()
+    role = 'Pasajero' if is_driver(update.effective_chat.id) else 'Conductor'
+    keyboard = [
+        [
+            InlineKeyboardButton("Cambiar rol a "+role, callback_data="CONFIG_ROLE"),
+        ],
+        [
+            InlineKeyboardButton("Eliminar cuenta", callback_data="CONFIG_DELETE_ACCOUNT"),
+        ],
+        [
+            InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    context.user_data['role'] = role
+    text = "Aquí puedes cambiar algunos ajustes avanzados."
+    query.edit_message_text(text, reply_markup=reply_markup)
+    return CONFIG_SELECT_ADVANCED
 
 def change_name(update, context):
     """Lets user change their username"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("Volver", callback_data="CONFIG_BACK")]]
+    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK")]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("⚠️ AVISO: Tu nombre y apellidos ayudan a los demás usuarios a reconocerte,"
@@ -57,17 +91,17 @@ def config_slots(update, context):
     query.answer()
     keyboard = [
         [
-            InlineKeyboardButton("1", callback_data="1"),
-            InlineKeyboardButton("2", callback_data="2"),
-            InlineKeyboardButton("3", callback_data="3"),
+            InlineKeyboardButton(emoji_numbers[1], callback_data="1"),
+            InlineKeyboardButton(emoji_numbers[2], callback_data="2"),
+            InlineKeyboardButton(emoji_numbers[3], callback_data="3"),
         ],
         [
-            InlineKeyboardButton("4", callback_data="4"),
-            InlineKeyboardButton("5", callback_data="5"),
-            InlineKeyboardButton("6", callback_data="6"),
+            InlineKeyboardButton(emoji_numbers[4], callback_data="4"),
+            InlineKeyboardButton(emoji_numbers[5], callback_data="5"),
+            InlineKeyboardButton(emoji_numbers[6], callback_data="6"),
         ],
         [
-            InlineKeyboardButton("Volver", callback_data="CONFIG_BACK"),
+            InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK"),
         ]
     ]
 
@@ -88,7 +122,7 @@ def config_bizum(update, context):
             InlineKeyboardButton("No", callback_data="No"),
         ],
         [
-            InlineKeyboardButton("Volver", callback_data="CONFIG_BACK"),
+            InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK"),
         ]
     ]
 
@@ -103,7 +137,7 @@ def change_car(update, context):
     """Lets driver change their car description"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("Volver", callback_data="CONFIG_BACK")]]
+    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK")]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("Escribe la descripción actualizada de tu coche.")
@@ -117,7 +151,7 @@ def change_fee(update, context):
     """Lets driver change their fee"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("Volver", callback_data="CONFIG_BACK")]]
+    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK")]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("Escribe el precio del trayecto por pasajero (máximo 1,5€).")
@@ -126,6 +160,46 @@ def change_fee(update, context):
     context.user_data['option'] = 'fee'
     context.user_data['sent_message'] = query.message
     return CHANGING_MESSAGE
+
+def change_role(update, context):
+    """Lets driver change their role"""
+    query = update.callback_query
+    query.answer()
+    role = context.user_data['role']
+    keyboard = [[InlineKeyboardButton("Sí", callback_data="Yes"),
+                 InlineKeyboardButton("No", callback_data="CONFIG_BACK")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    text = "Vas a cambiar tu rol habitual a "+role+"."
+    if role=='Pasajero':
+        text += ("\n⚠️ Si haces esto se borrarán todos tus viajes ofertados y"
+                 " tu configuración como conductor.")
+    elif role=='Conductor':
+        text += ("\n🚗 Haz esto si piensas empezar a ofertar viajes con tu coche."
+                 " Se te dará acceso a ajustes adicionales para conductores.")
+    text += "\n¿Deseas continuar?"
+    query.edit_message_text(text=text, reply_markup=reply_markup)
+
+    context.user_data['option'] = 'role'
+    return CHOOSING_ADVANCED_OPTION
+
+def config_delete_account(update, context):
+    """Asks user if they really want to delete their account"""
+    query = update.callback_query
+    query.answer()
+    keyboard = [[InlineKeyboardButton("Sí", callback_data="Yes"),
+                 InlineKeyboardButton("No", callback_data="CONFIG_BACK")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    text = ("⚠️⚠️ Vas a eliminar tu cuenta del bot de BenalUMA. ⚠️⚠️"
+            "\n Si haces esto, todos tus datos serán eliminados y tendrás que"
+            " volver a registrarte para poder acceder a todas las funcionalidades"
+            " de nuevo.")
+    text += "\n¿Deseas continuar?"
+    query.edit_message_text(text=text, reply_markup=reply_markup)
+
+    context.user_data['option'] = 'delete'
+    return CHOOSING_ADVANCED_OPTION
 
 def update_user_property(update, context):
     option = context.user_data['option']
@@ -156,8 +230,12 @@ def update_user_property(update, context):
     context.user_data.clear()
 
     reply_markup = config_keyboard(update.effective_chat.id)
-    text += "\nPuedes seguir cambiando ajustes."
-    update.message.reply_text(text, reply_markup=reply_markup)
+    text = escape_markdown(text, 2)
+    text += "\n\n Esta es tu configuración actual: \n"
+    text += get_formatted_user_config(update.effective_chat.id) + "\n"
+    text += "\nPuedes seguir cambiando ajustes\."
+    update.message.reply_text(text, reply_markup=reply_markup,
+                              parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return CONFIG_SELECT
 
 def update_user_property_callback(update, context):
@@ -166,7 +244,6 @@ def update_user_property_callback(update, context):
 
     text = ""
     option = context.user_data['option']
-    context.user_data.clear()
     if option == 'slots':
         set_slots(update.effective_chat.id, int(query.data))
         text = "Número de asientos disponibles cambiado correctamente."
@@ -174,10 +251,32 @@ def update_user_property_callback(update, context):
         bizum_flag = True if query.data=="Yes" else False
         set_bizum(update.effective_chat.id, bizum_flag)
         text = "Preferencia de Bizum modificada correctamente."
+    elif option == 'role':
+        role = context.user_data['role']
+        if role=='Conductor':
+            add_driver(update.effective_chat.id, 3, "")
+            text = ("Rol cambiado a conductor correctamente."
+                    "\nSe te aplicado una configuración por defecto. Por favor,"
+                    " configura correctamente al menos tu número de asientos y"
+                    " la descripción de tu coche.")
+        elif role=='Pasajero':
+            delete_driver(update.effective_chat.id)
+            text = "Rol cambiado a pasajero correctamente."
+    elif option == 'delete':
+        delete_user(update.effective_chat.id)
+        text = ("Tu cuenta se ha eliminado correctamente."
+                "\n¡Que te vaya bien! 🖖")
+        query.edit_message_text(text)
+        return ConversationHandler.END
 
+    context.user_data.clear()
     reply_markup = config_keyboard(update.effective_chat.id)
-    text += "\nPuedes seguir cambiando ajustes."
-    query.edit_message_text(text=text, reply_markup=reply_markup)
+    text = escape_markdown(text, 2)
+    text += "\n\n Esta es tu configuración actual: \n"
+    text += get_formatted_user_config(update.effective_chat.id) + "\n"
+    text += "\nPuedes seguir cambiando ajustes\."
+    query.edit_message_text(text, reply_markup=reply_markup,
+                            parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return CONFIG_SELECT
 
 def config_end(update, context):
@@ -199,6 +298,11 @@ def add_handlers(dispatcher):
                 CallbackQueryHandler(change_car, pattern='^CONFIG_CAR$'),
                 CallbackQueryHandler(change_fee, pattern='^CONFIG_FEE$'),
                 CallbackQueryHandler(config_end, pattern='^CONFIG_END$'),
+                CallbackQueryHandler(config_select_advanced, pattern='^CONFIG_ADVANCED$'),
+            ],
+            CONFIG_SELECT_ADVANCED: [
+                CallbackQueryHandler(change_role, pattern='^CONFIG_ROLE$'),
+                CallbackQueryHandler(config_delete_account, pattern='^CONFIG_DELETE_ACCOUNT$'),
             ],
             CHANGING_MESSAGE: [
                 MessageHandler(Filters.text & ~Filters.command, update_user_property),
@@ -209,6 +313,9 @@ def add_handlers(dispatcher):
             CHANGING_BIZUM: [
                 CallbackQueryHandler(update_user_property_callback, pattern='^(Yes|No)$')
             ],
+            CHOOSING_ADVANCED_OPTION: [
+                CallbackQueryHandler(update_user_property_callback, pattern='^Yes$')
+            ]
         },
         fallbacks=[CallbackQueryHandler(config_restart, pattern='^CONFIG_BACK$')],
     )
