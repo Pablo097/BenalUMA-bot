@@ -7,39 +7,39 @@ REG_NAME, REG_USAGE, REG_SLOTS, REG_CAR = range(4)
 
 def start(update, context):
     if update.message.chat.type == "private":
-        text = ("¡Bienvenido al bot de BenalUMA! 🚗🚗"
-                "\n\nPara comenzar, escribe /registro para registrarte en el sistema"
-                " o /help para ver los comandos disponibles.")
+        text = f"¡Bienvenido al bot de BenalUMA! 🚗🚗"\
+               f"\n\nPara comenzar, escribe /registro para registrarte en el sistema"\
+               f" o /help para ver los comandos disponibles."
         update.message.reply_text(text)
     else:
-        text = "Para comenzar, escríbeme un mensaje privado a @BenalUMA_bot"
+        text = f"Para comenzar, escríbeme un mensaje privado a @BenalUMA_bot"
         update.message.reply_text(text)
 
 def help(update, context):
     if update.message.chat.type == "private":
-        text = "Comandos disponibles:"
+        text = f"Comandos disponibles:"
 
         if is_registered(update.effective_chat.id):
-            text += "\n⚙️ /config - Accede a las opciones de configuración de tu cuenta."
+            text += f"\n⚙️ /config - Accede a las opciones de configuración de tu cuenta."
         else:
-            text += "\n🔑 /registro - Comienza a usar BenalUMA registrándote en el sistema."
+            text += f"\n🔑 /registro - Comienza a usar BenalUMA registrándote en el sistema."
 
         update.message.reply_text(text)
     else:
-        update.message.reply_text("Para información, escríbeme un mensaje privado a @BenalUMA_bot.")
+        update.message.reply_text(f"Para información, escríbeme un mensaje privado a @BenalUMA_bot.")
 
 def register(update, context):
     """Starts the register conversation process"""
     if is_registered(update.effective_chat.id):
-        text = "Ya te has registrado en el sistema."
+        text = f"Ya te has registrado en el sistema."
         update.message.reply_text(text)
         return ConversationHandler.END
     else:
-        text = ("Antes de registrarte, asegúrate de unirte al grupo de BenalUMA "
-                "y conocer las normas de uso. Envía /cancelar para cancelar el registro.")
+        text = f"Antes de registrarte, asegúrate de unirte al grupo de BenalUMA "\
+               f"y conocer las normas de uso. Envía /cancelar para cancelar el registro."
         update.message.reply_text(text)
-        text = ("Introduzca su nombre y apellidos, los cuales serán mostrados a los "
-                "demás usuarios.")
+        text = f"Introduzca su nombre y apellidos, los cuales serán mostrados a los "\
+               f"demás usuarios."
         update.message.reply_text(text)
         return REG_NAME
 
@@ -48,8 +48,8 @@ def register_name(update, context):
     add_user(update.effective_chat.id, update.message.text)
 
     reply_keyboard = [["Conduzco"], ["Pido coche"]]
-    text = ("Tu nombre ha sido guardado con éxito."
-            "\nIndica ahora si normalmente llevas o pides coche.")
+    text = f"Tu nombre ha sido guardado con éxito."\
+           f"\nIndica ahora si normalmente llevas o pides coche."
     update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(
         reply_keyboard, one_time_keyboard=True, input_field_placeholder='Normalmente...'
     ))
@@ -60,13 +60,13 @@ def register_usage(update, context):
     """Checks user typical usage and continues conversation if necessary"""
     if update.message.text == 'Conduzco':
         reply_keyboard = [[1,2,3], [4,5,6]]
-        text = "Indica ahora cuántos asientos disponibles sueles ofertar."
+        text = f"Indica ahora cuántos asientos disponibles sueles ofertar."
         update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(
             reply_keyboard, one_time_keyboard=True,
             input_field_placeholder='Número de asientos'))
         return REG_SLOTS
     else:
-        text = "Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
+        text = f"Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
         update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
 
@@ -74,8 +74,8 @@ def register_slots(update, context):
     """Stores user slots and continues conversation"""
     context.user_data['slots'] = update.message.text
 
-    text = ("Finalmente, indica el modelo y color de tu coche para facilitar a "
-            "los pasajeros reconocerlo cuando los recojas.")
+    text = f"Finalmente, indica el modelo y color de tu coche para facilitar a "\
+           f"los pasajeros reconocerlo cuando los recojas."
     update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
 
     return REG_CAR
@@ -87,7 +87,7 @@ def register_car(update, context):
     context.user_data.clear()
     add_driver(update.effective_chat.id, slots, car)
 
-    text = "Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
+    text = f"Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
     update.message.reply_text(text)
 
     return ConversationHandler.END

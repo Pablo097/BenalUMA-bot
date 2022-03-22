@@ -20,7 +20,7 @@ def add_user(chat_id, username):
     None
 
     """
-    ref = db.reference('/Users/'+str(chat_id))
+    ref = db.reference(f"/Users/{str(chat_id)}")
     ref.set({"Name": username})
 
 def is_registered(chat_id):
@@ -55,7 +55,7 @@ def get_name(chat_id):
 
     """
 
-    return db.reference('/Users/'+str(chat_id)+'/Name').get()
+    return db.reference(f"/Users/{str(chat_id)}/Name").get()
 
 def set_name(chat_id, name):
     """Sets the username given its chat_id.
@@ -73,7 +73,7 @@ def set_name(chat_id, name):
 
     """
 
-    ref = db.reference('/Users/'+str(chat_id))
+    ref = db.reference(f"/Users/{str(chat_id)}")
     ref.update({'Name': name})
 
 def delete_user(chat_id):
@@ -90,7 +90,7 @@ def delete_user(chat_id):
 
     """
 
-    db.reference('/Users/'+str(chat_id)).delete()
+    db.reference(f"/Users/{str(chat_id)}").delete()
     if is_driver(chat_id):
         delete_driver(chat_id)
 
@@ -115,7 +115,7 @@ def add_driver(chat_id, slots, car):
 
     """
 
-    ref = db.reference('/Drivers/'+str(chat_id))
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
     ref.set({"Slots": slots})
     ref.update({"Car": car})
 
@@ -151,7 +151,7 @@ def delete_driver(chat_id):
 
     """
 
-    db.reference('/Drivers/'+str(chat_id)).delete()
+    db.reference(f"/Drivers/{str(chat_id)}").delete()
     # TODO: Delete all possible planned trips
     # (inside delete_trip function, alert possible passengers that the
     # trip has been cancelled)
@@ -171,7 +171,7 @@ def get_slots(chat_id):
 
     """
 
-    ref = db.reference('/Drivers/'+str(chat_id))
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
     return int(ref.child('Slots').get())
 
 def set_slots(chat_id, slots):
@@ -190,7 +190,7 @@ def set_slots(chat_id, slots):
 
     """
 
-    db.reference('/Drivers/'+str(chat_id)).update({"Slots": slots})
+    db.reference(f"/Drivers/{str(chat_id)}").update({"Slots": slots})
 
 def get_car(chat_id):
     """Gets the car description of a driver.
@@ -207,7 +207,7 @@ def get_car(chat_id):
 
     """
 
-    ref = db.reference('/Drivers/'+str(chat_id))
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
     return ref.child('Car').get()
 
 def set_car(chat_id, car):
@@ -226,7 +226,7 @@ def set_car(chat_id, car):
 
     """
 
-    db.reference('/Drivers/'+str(chat_id)).update({"Car": car})
+    db.reference(f"/Drivers/{str(chat_id)}").update({"Car": car})
 
 def get_fee(chat_id):
     """Gets the per-user payment quantity for a driver.
@@ -243,7 +243,7 @@ def get_fee(chat_id):
 
     """
 
-    ref = db.reference('/Drivers/'+str(chat_id))
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
     fee = ref.child('Fee').get()
     if fee != None:
         return float(fee)
@@ -266,7 +266,7 @@ def set_fee(chat_id, fee):
 
     """
 
-    db.reference('/Drivers/'+str(chat_id)).update({"Fee": fee})
+    db.reference(f"/Drivers/{str(chat_id)}").update({"Fee": fee})
 
 def get_bizum(chat_id):
     """Gets the Bizum preference a driver.
@@ -283,7 +283,7 @@ def get_bizum(chat_id):
 
     """
 
-    ref = db.reference('/Drivers/'+str(chat_id))
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
     bizum = ref.child('Bizum').get()
     if bizum == 'Yes':
         return True
@@ -308,7 +308,7 @@ def set_bizum(chat_id, bizum_pref):
 
     """
 
-    ref = db.reference('/Drivers/'+str(chat_id))
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
     if bizum_pref:
         ref.update({"Bizum": "Yes"})
     else:
@@ -342,7 +342,7 @@ def new_trip(direction, chat_id, departure_date, time_window = 0,
     None
 
     """
-    ref = db.reference('/Trips/'+direction)
+    ref = db.reference(f"/Trips/{direction}")
     date_string = departure_date.strftime('%Y-%m-%d')
     ref = ref.child(date_string)
 

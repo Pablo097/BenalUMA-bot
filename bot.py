@@ -40,7 +40,7 @@ def echo(update, context):
 
 def record(update, context):
     """Logs message into database."""
-    ref = db.reference('/Users/'+str(update.effective_chat.id))
+    ref = db.reference(f"/Users/{str(update.effective_chat.id)}")
     ref.update({"message": ' '.join(context.args)})
 
 def error(update, context):
@@ -76,7 +76,7 @@ def main(webhook_flag = True):
             listen="0.0.0.0",
             port=int(PORT),
             url_path=TOKEN,
-            webhook_url='https://' + NAME + '.herokuapp.com/' + TOKEN
+            webhook_url=f"https://{NAME}.herokuapp.com/{TOKEN}"
         )
     else:
         # For local development purposes

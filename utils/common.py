@@ -19,20 +19,20 @@ def get_formatted_user_config(chat_id):
         Formatted string with user's configuration.
 
     """
-    string = "💬 *Nombre*: `" + get_name(chat_id) + "`"
+    string = f"💬 *Nombre*: `{get_name(chat_id)}`"
     role = 'Conductor' if is_driver(chat_id) else 'Pasajero'
-    string += "\n🧍 *Rol*: `" + role + "`"
+    string += f"\n🧍 *Rol*: `{role}`"
 
     if role == 'Conductor':
-        string += "\n💺 *Asientos disponibles*: `" + str(get_slots(chat_id)) + "`"
-        string += "\n🚘 *Descripción vehículo*: `" + get_car(chat_id) + "`"
+        string += f"\n💺 *Asientos disponibles*: `{str(get_slots(chat_id))}`"
+        string += f"\n🚘 *Descripción vehículo*: `{get_car(chat_id)}`"
         fee = get_fee(chat_id)
         if fee != None:
-            string += "\n🪙 *Pago por trayecto*: `" + str(fee).replace('.',',') + "€`"
+            string += f"\n🪙 *Pago por trayecto*: `{str(fee).replace('.',',')}€`"
         bizum = get_bizum(chat_id)
         if bizum == True:
-            string += "\n💸 `Aceptas Bizum`"
+            string += f"\n💸 `Aceptas Bizum`"
         elif bizum == False:
-            string += "\n💸🚫 `NO aceptas Bizum`"
+            string += f"\n💸🚫 `NO aceptas Bizum`"
 
     return string

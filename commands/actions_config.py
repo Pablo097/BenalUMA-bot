@@ -21,14 +21,14 @@ def config(update, context):
     if is_registered(update.effective_chat.id):
         reply_markup = config_keyboard(update.effective_chat.id)
 
-        text = "Aquí puedes modificar la configuración asociada a tu cuenta\."
-        text += "\n\n Esta es tu configuración actual: \n"
-        text += get_formatted_user_config(update.effective_chat.id) + "\n"
+        text = f"Aquí puedes modificar la configuración asociada a tu cuenta\."
+        text += f"\n\n Esta es tu configuración actual: \n"
+        text += f"{get_formatted_user_config(update.effective_chat.id)} \n"
         update.message.reply_text(text, reply_markup=reply_markup,
                                   parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return CONFIG_SELECT
     else:
-        text = "Antes de poder usar este comando debes registrarte con el comando /registro."
+        text = f"Antes de poder usar este comando debes registrarte con el comando /registro."
         update.message.reply_text(text)
         return ConversationHandler.END
 
@@ -38,9 +38,9 @@ def config_restart(update, context):
     query.answer()
     reply_markup = config_keyboard(update.effective_chat.id)
 
-    text = "Esta es tu configuración actual: \n"
-    text += get_formatted_user_config(update.effective_chat.id) + "\n\n"
-    text += "Puedes seguir cambiando ajustes\."
+    text = f"Esta es tu configuración actual: \n"
+    text += get_formatted_user_config(update.effective_chat.id)
+    text += f"\n\nPuedes seguir cambiando ajustes\."
     query.edit_message_text(text, reply_markup=reply_markup,
                             parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return CONFIG_SELECT
@@ -52,7 +52,7 @@ def config_select_advanced(update, context):
     role = 'Pasajero' if is_driver(update.effective_chat.id) else 'Conductor'
     keyboard = [
         [
-            InlineKeyboardButton("Cambiar rol a "+role, callback_data="CONFIG_ROLE"),
+            InlineKeyboardButton(f"Cambiar rol a {role}", callback_data="CONFIG_ROLE"),
         ],
         [
             InlineKeyboardButton("Eliminar cuenta", callback_data="CONFIG_DELETE_ACCOUNT"),
@@ -64,7 +64,7 @@ def config_select_advanced(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     context.user_data['role'] = role
-    text = "Aquí puedes cambiar algunos ajustes avanzados."
+    text = f"Aquí puedes cambiar algunos ajustes avanzados."
     query.edit_message_text(text, reply_markup=reply_markup)
     return CONFIG_SELECT_ADVANCED
 
@@ -75,10 +75,10 @@ def change_name(update, context):
     keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK")]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    text = ("⚠️ AVISO: Tu nombre y apellidos ayudan a los demás usuarios a reconocerte,"
-            " así que deberías intentar no cambiarlos. \nSi aún así quieres cambiarlos"
-            " (quizás porque te hubieras equivocado al registrarte), por favor,"
-            " mándame de nuevo tu nombre y apellidos.")
+    text = f"⚠️ AVISO: Tu nombre y apellidos ayudan a los demás usuarios a reconocerte,"\
+           f" así que deberías intentar no cambiarlos. \nSi aún así quieres cambiarlos"\
+           f" (quizás porque te hubieras equivocado al registrarte), por favor,"\
+           f" mándame de nuevo tu nombre y apellidos."
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
     context.user_data['option'] = 'name'
@@ -170,14 +170,14 @@ def change_role(update, context):
                  InlineKeyboardButton("No", callback_data="CONFIG_BACK")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = "Vas a cambiar tu rol habitual a "+role+"."
+    text = f"Vas a cambiar tu rol habitual a {role}."
     if role=='Pasajero':
-        text += ("\n⚠️ Si haces esto se borrarán todos tus viajes ofertados y"
-                 " tu configuración como conductor.")
+        text += f"\n⚠️ Si haces esto se borrarán todos tus viajes ofertados y"\
+                f" tu configuración como conductor."
     elif role=='Conductor':
-        text += ("\n🚗 Haz esto si piensas empezar a ofertar viajes con tu coche."
-                 " Se te dará acceso a ajustes adicionales para conductores.")
-    text += "\n¿Deseas continuar?"
+        text += f"\n🚗 Haz esto si piensas empezar a ofertar viajes con tu coche."\
+                f" Se te dará acceso a ajustes adicionales para conductores."
+    text += f"\n¿Deseas continuar?"
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
     context.user_data['option'] = 'role'
@@ -191,11 +191,11 @@ def config_delete_account(update, context):
                  InlineKeyboardButton("No", callback_data="CONFIG_BACK")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = ("⚠️⚠️ Vas a eliminar tu cuenta del bot de BenalUMA. ⚠️⚠️"
-            "\n Si haces esto, todos tus datos serán eliminados y tendrás que"
-            " volver a registrarte para poder acceder a todas las funcionalidades"
-            " de nuevo.")
-    text += "\n¿Deseas continuar?"
+    text = f"⚠️⚠️ Vas a eliminar tu cuenta del bot de BenalUMA. ⚠️⚠️"\
+           f"\n Si haces esto, todos tus datos serán eliminados y tendrás que"\
+           f" volver a registrarte para poder acceder a todas las funcionalidades"\
+           f" de nuevo."
+    text += f"\n¿Deseas continuar?"
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
     context.user_data['option'] = 'delete'
@@ -207,22 +207,22 @@ def update_user_property(update, context):
     text = ""
     if option == 'name':
         set_name(update.effective_chat.id, update.message.text)
-        text = "Nombre de usuario cambiado correctamente."
+        text = f"Nombre de usuario cambiado correctamente."
     elif option == 'car':
         set_car(update.effective_chat.id, update.message.text)
-        text = "Descripción del vehículo actualizada correctamente."
+        text = f"Descripción del vehículo actualizada correctamente."
     elif option == 'fee':
         try:
             fee = float(re.search("([0-9]*[.,])?[0-9]+", update.message.text).group().replace(',','.'))
         except:
             fee = -1
         if not (fee>=0 and fee<=MAX_FEE):
-            text = "Por favor, introduce un número entre 0 y " + str(MAX_FEE).replace('.',',') + "."
+            text = f"Por favor, introduce un número entre 0 y {str(MAX_FEE).replace('.',',')}."
             update.message.reply_text(text)
             return CHANGING_MESSAGE
         else:
             set_fee(update.effective_chat.id, fee)
-            text = "Precio del trayecto actualizado a " + str(fee).replace('.',',') + "€."
+            text = f"Precio del trayecto actualizado a {str(fee).replace('.',',')}€."
 
     # Remove possible inline keyboard from previous message
     if 'sent_message' in context.user_data:
@@ -231,9 +231,9 @@ def update_user_property(update, context):
 
     reply_markup = config_keyboard(update.effective_chat.id)
     text = escape_markdown(text, 2)
-    text += "\n\n Esta es tu configuración actual: \n"
-    text += get_formatted_user_config(update.effective_chat.id) + "\n"
-    text += "\nPuedes seguir cambiando ajustes\."
+    text += f"\n\n Esta es tu configuración actual: \n"
+    text += get_formatted_user_config(update.effective_chat.id)
+    text += f"\n\nPuedes seguir cambiando ajustes\."
     update.message.reply_text(text, reply_markup=reply_markup,
                               parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return CONFIG_SELECT
@@ -246,35 +246,34 @@ def update_user_property_callback(update, context):
     option = context.user_data['option']
     if option == 'slots':
         set_slots(update.effective_chat.id, int(query.data))
-        text = "Número de asientos disponibles cambiado correctamente."
+        text = f"Número de asientos disponibles cambiado correctamente."
     elif option == 'bizum':
         bizum_flag = True if query.data=="Yes" else False
         set_bizum(update.effective_chat.id, bizum_flag)
-        text = "Preferencia de Bizum modificada correctamente."
+        text = f"Preferencia de Bizum modificada correctamente."
     elif option == 'role':
         role = context.user_data['role']
         if role=='Conductor':
             add_driver(update.effective_chat.id, 3, "")
-            text = ("Rol cambiado a conductor correctamente."
-                    "\nSe te aplicado una configuración por defecto. Por favor,"
-                    " configura correctamente al menos tu número de asientos y"
-                    " la descripción de tu coche.")
+            text = f"Rol cambiado a conductor correctamente."\
+                   f"\nSe te aplicado una configuración por defecto. Por favor,"\
+                   f" configura correctamente al menos tu número de asientos y"\
+                   f" la descripción de tu coche."
         elif role=='Pasajero':
             delete_driver(update.effective_chat.id)
-            text = "Rol cambiado a pasajero correctamente."
+            text = f"Rol cambiado a pasajero correctamente."
     elif option == 'delete':
         delete_user(update.effective_chat.id)
-        text = ("Tu cuenta se ha eliminado correctamente."
-                "\n¡Que te vaya bien! 🖖")
+        text = f"Tu cuenta se ha eliminado correctamente. \n¡Que te vaya bien! 🖖"
         query.edit_message_text(text)
         return ConversationHandler.END
 
     context.user_data.clear()
     reply_markup = config_keyboard(update.effective_chat.id)
     text = escape_markdown(text, 2)
-    text += "\n\n Esta es tu configuración actual: \n"
-    text += get_formatted_user_config(update.effective_chat.id) + "\n"
-    text += "\nPuedes seguir cambiando ajustes\."
+    text += f"\n\n Esta es tu configuración actual: \n"
+    text += get_formatted_user_config(update.effective_chat.id)
+    text += f"\n\nPuedes seguir cambiando ajustes\."
     query.edit_message_text(text, reply_markup=reply_markup,
                             parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return CONFIG_SELECT
