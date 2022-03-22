@@ -1,7 +1,7 @@
 from os import environ
 import logging
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
-from commands import actions
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from commands import actions, actions_config
 import firebase_admin
 from firebase_admin import db
 import json
@@ -32,8 +32,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-REG_NAME, REG_USAGE, REG_SLOTS, REG_CAR = range(4)
-
 # Define a few command handlers. These usually take the two arguments update and
 # context. Error handlers also receive the raised TelegramError object in error.
 def echo(update, context):
@@ -57,27 +55,14 @@ def main(webhook_flag = True):
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
+    # Add general actions (start, help, register)
+    actions.add_handlers(dp)
+
+    # Add configuration actions
+    actions_config.add_handlers(dp)
+
     # on different commands - answer in Telegram
-    dp.add_handler(CommandHandler("start", actions.start))
-    dp.add_handler(CommandHandler("help", actions.help))
     dp.add_handler(CommandHandler("record", record))
-
-    # Add register conversation handler
-    reg_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('registro', actions.register)],
-        states={
-            REG_NAME: [MessageHandler(Filters.text & ~Filters.command, actions.register_name)],
-            REG_USAGE: [MessageHandler(Filters.regex('^(Conduzco|Pido coche)$'),
-                                    actions.register_usage)],
-            REG_SLOTS: [
-                MessageHandler(Filters.regex('^(1|2|3|4|5|6)$'), actions.register_slots),
-            ],
-            REG_CAR: [MessageHandler(Filters.text & ~Filters.command, actions.register_car)],
-        },
-        fallbacks=[CommandHandler('cancelar', actions.register_cancel)],
-    )
-
-    dp.add_handler(reg_conv_handler)
 
     # on noncommand i.e message - echo the message on Telegram
     dp.add_handler(MessageHandler(Filters.text, echo))

@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import db
 import json
+from datetime import datetime
 
 # General
 
@@ -56,6 +57,25 @@ def get_name(chat_id):
 
     return db.reference('/Users/'+str(chat_id)+'/Name').get()
 
+def set_name(chat_id, name):
+    """Sets the username given its chat_id.
+
+    Parameters
+    ----------
+    chat_id : int
+        The chat_id to check
+    name: string
+        The name for the user
+
+    Returns
+    -------
+    None
+
+    """
+
+    ref = db.reference('/Users/'+str(chat_id))
+    ref.update({'Name': name})
+
 def delete_user(chat_id):
     """Deletes user from database.
 
@@ -96,7 +116,7 @@ def add_driver(chat_id, slots, car):
     """
 
     ref = db.reference('/Drivers/'+str(chat_id))
-    ref.set({"Slots": str(slots)})
+    ref.set({"Slots": slots})
     ref.update({"Car": car})
 
 def is_driver(chat_id):
@@ -151,6 +171,24 @@ def get_slots(chat_id):
     ref = db.reference('/Drivers/'+str(chat_id))
     return int(ref.child('Slots').get())
 
+def set_slots(chat_id, slots):
+    """Sets the number of slots of a driver.
+
+    Parameters
+    ----------
+    chat_id : int
+        The chat_id of the driver.
+    slots : int
+        Number of available seats, excluding the driver.
+
+    Returns
+    -------
+    None
+
+    """
+
+    db.reference('/Drivers/'+str(chat_id)).update({"Slots": slots})
+
 def get_car(chat_id):
     """Gets the car description of a driver.
 
@@ -168,3 +206,147 @@ def get_car(chat_id):
 
     ref = db.reference('/Drivers/'+str(chat_id))
     return ref.child('Car').get()
+
+def set_car(chat_id, car):
+    """Sets the car description of a driver.
+
+    Parameters
+    ----------
+    chat_id : int
+        The chat_id of the driver.
+    car : str
+        Description of the car.
+
+    Returns
+    -------
+    None
+
+    """
+
+    db.reference('/Drivers/'+str(chat_id)).update({"Car": car})
+
+def get_fee(chat_id):
+    """Gets the per-user payment quantity for a driver.
+
+    Parameters
+    ----------
+    chat_id : int
+        The chat_id to check.
+
+    Returns
+    -------
+    float
+        Driver's fee.
+
+    """
+
+    ref = db.reference('/Drivers/'+str(chat_id))
+    return float(ref.child('Fee').get())
+
+def set_fee(chat_id, fee):
+    """Sets the per-user payment quantity for a driver.
+
+    Parameters
+    ----------
+    chat_id : int
+        The chat_id of the driver.
+    fee : float
+        The driver's fee.
+
+    Returns
+    -------
+    None
+
+    """
+
+    db.reference('/Drivers/'+str(chat_id)).update({"Fee": fee})
+
+def get_bizum(chat_id):
+    """Gets the Bizum preference a driver.
+
+    Parameters
+    ----------
+    chat_id : int
+        The chat_id to check.
+
+    Returns
+    -------
+    boolean
+        True if the driver accepts Bizum, False otherwise.
+
+    """
+
+    ref = db.reference('/Drivers/'+str(chat_id))
+    if ref.child('Bizum').get() == 'Si':
+        return True
+    else:
+        return False
+
+def set_bizum(chat_id, bizum_pref):
+    """Sets the Bizum preference a driver.
+
+    Parameters
+    ----------
+    chat_id : int
+        The chat_id of the driver.
+    bizum_pref : boolean
+        True for indicating that Bizum is accepted, False otherwise.
+
+    Returns
+    -------
+    None
+
+    """
+
+    ref = db.reference('/Drivers/'+str(chat_id))
+    if bizum_pref:
+        ref.update({"Bizum": "Si"})
+    else:
+        ref.update({"Bizum": "No"})
+
+
+# Trips
+
+def new_trip(direction, chat_id, departure_date, time_window = 0,
+             slots = None, fee = None):
+    """Creates new trip with given information.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    chat_id : int
+        The chat_id of the driver.
+    departure_date : datetime
+        Datetime object with the departur date and time of the trip.
+    time_window : int
+        Determines how flexible is the departure time as the number of
+        minutes from it.
+    slots : int
+        Optional. Number of available slots for this specific trip.
+    fee : float
+        Optional. The per-user payment quantity.
+
+    Returns
+    -------
+    None
+
+    """
+    ref = db.reference('/Trips/'+direction)
+    date_string = departure_date.strftime('%Y-%m-%d')
+    ref = ref.child(date_string)
+
+    time_string = departure_date.strftime('%H:%M')
+    trip_dict = {'Chat ID': chat_id,
+                 'Time': time_string}
+
+    if time_window>0:
+        trip_dict['Time Window'] = time_window
+
+    if slots != None:
+        trip_dict['Slots'] = slots
+
+    if fee != None:
+        trip_dict['Fee'] = fee
+
+    ref.push(trip_dict)

@@ -20,9 +20,9 @@ def help(update, context):
         text = "Comandos disponibles:"
 
         if is_registered(update.effective_chat.id):
-            text += "\nNo hay ayuda aún."
+            text += "\n⚙️ /config - Accede a las opciones de configuración de tu cuenta."
         else:
-            text += "\n🖊 /registro - Comienza a usar BenalUMA registrándote en el sistema."
+            text += "\n🔑 /registro - Comienza a usar BenalUMA registrándote en el sistema."
 
         update.message.reply_text(text)
     else:
@@ -82,7 +82,7 @@ def register_slots(update, context):
 
 def register_car(update, context):
     """Stores driver info into DB and ends the conversation"""
-    slots = context.user_data['slots']
+    slots = int(context.user_data['slots'])
     car = update.message.text
     context.user_data.clear()
     add_driver(update.effective_chat.id, slots, car)
@@ -99,3 +99,24 @@ def register_cancel(update, context):
     )
 
     return ConversationHandler.END
+
+def add_handlers(dispatcher):
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("help", help))
+
+    # Add register conversation handler
+    reg_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('registro', register)],
+        states={
+            REG_NAME: [MessageHandler(Filters.text & ~Filters.command, register_name)],
+            REG_USAGE: [MessageHandler(Filters.regex('^(Conduzco|Pido coche)$'),
+                                    register_usage)],
+            REG_SLOTS: [
+                MessageHandler(Filters.regex('^(1|2|3|4|5|6)$'), register_slots),
+            ],
+            REG_CAR: [MessageHandler(Filters.text & ~Filters.command, register_car)],
+        },
+        fallbacks=[CommandHandler('cancelar', register_cancel)],
+    )
+
+    dispatcher.add_handler(reg_conv_handler)
