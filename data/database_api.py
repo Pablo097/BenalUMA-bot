@@ -317,7 +317,7 @@ def set_bizum(chat_id, bizum_pref):
 
 # Trips
 
-def new_trip(direction, chat_id, departure_date, time_window = 0,
+def add_trip(direction, chat_id, date, time, time_window = 0,
              slots = None, fee = None):
     """Creates new trip with given information.
 
@@ -327,8 +327,10 @@ def new_trip(direction, chat_id, departure_date, time_window = 0,
         Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
     chat_id : int
         The chat_id of the driver.
-    departure_date : datetime
-        Datetime object with the departur date and time of the trip.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'
+    time : string
+        Departure time with ISO format 'HH:MM'
     time_window : int
         Determines how flexible is the departure time as the number of
         minutes from it.
@@ -343,12 +345,12 @@ def new_trip(direction, chat_id, departure_date, time_window = 0,
 
     """
     ref = db.reference(f"/Trips/{direction}")
-    date_string = departure_date.strftime('%Y-%m-%d')
-    ref = ref.child(date_string)
+    # date_string = departure_date.strftime('%Y-%m-%d')
+    ref = ref.child(date)
 
-    time_string = departure_date.strftime('%H:%M')
+    # time_string = departure_date.strftime('%H:%M')
     trip_dict = {'Chat ID': chat_id,
-                 'Time': time_string}
+                 'Time': time}
 
     if time_window>0:
         trip_dict['Time Window'] = time_window

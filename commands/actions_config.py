@@ -202,7 +202,7 @@ def config_delete_account(update, context):
     return CHOOSING_ADVANCED_OPTION
 
 def update_user_property(update, context):
-    option = context.user_data['option']
+    option = context.user_data.pop('option')
 
     text = ""
     if option == 'name':
@@ -213,7 +213,7 @@ def update_user_property(update, context):
         text = f"Descripción del vehículo actualizada correctamente."
     elif option == 'fee':
         try:
-            fee = float(re.search("([0-9]*[.,])?[0-9]+", update.message.text).group().replace(',','.'))
+            fee = obtain_float_from_string(update.message.text)
         except:
             fee = -1
         if not (fee>=0 and fee<=MAX_FEE):
@@ -226,8 +226,8 @@ def update_user_property(update, context):
 
     # Remove possible inline keyboard from previous message
     if 'sent_message' in context.user_data:
-        context.user_data['sent_message'].edit_reply_markup(None)
-    context.user_data.clear()
+        sent_message = context.user_data.pop('sent_message')
+        sent_message.edit_reply_markup(None)
 
     reply_markup = config_keyboard(update.effective_chat.id)
     text = escape_markdown(text, 2)
@@ -243,7 +243,7 @@ def update_user_property_callback(update, context):
     query.answer()
 
     text = ""
-    option = context.user_data['option']
+    option = context.user_data.pop('option')
     if option == 'slots':
         set_slots(update.effective_chat.id, int(query.data))
         text = f"Número de asientos disponibles cambiado correctamente."
@@ -252,7 +252,7 @@ def update_user_property_callback(update, context):
         set_bizum(update.effective_chat.id, bizum_flag)
         text = f"Preferencia de Bizum modificada correctamente."
     elif option == 'role':
-        role = context.user_data['role']
+        role = context.user_data.pop('role')
         if role=='Conductor':
             add_driver(update.effective_chat.id, 3, "")
             text = f"Rol cambiado a conductor correctamente."\
@@ -268,7 +268,6 @@ def update_user_property_callback(update, context):
         query.edit_message_text(text)
         return ConversationHandler.END
 
-    context.user_data.clear()
     reply_markup = config_keyboard(update.effective_chat.id)
     text = escape_markdown(text, 2)
     text += f"\n\n Esta es tu configuración actual: \n"
@@ -316,7 +315,8 @@ def add_handlers(dispatcher):
                 CallbackQueryHandler(update_user_property_callback, pattern='^Yes$')
             ]
         },
-        fallbacks=[CallbackQueryHandler(config_restart, pattern='^CONFIG_BACK$')],
+        fallbacks=[CallbackQueryHandler(config_restart, pattern='^CONFIG_BACK$'),
+                   CommandHandler('config', config)],
     )
 
     dispatcher.add_handler(config_conv_handler)
