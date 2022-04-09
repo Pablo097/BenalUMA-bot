@@ -341,7 +341,8 @@ def add_trip(direction, chat_id, date, time, time_window = 0,
 
     Returns
     -------
-    None
+    string
+        Key of the newly created DB reference.
 
     """
     ref = db.reference(f"/Trips/{direction}")
@@ -361,4 +362,16 @@ def add_trip(direction, chat_id, date, time, time_window = 0,
     if fee != None:
         trip_dict['Fee'] = fee
 
-    ref.push(trip_dict)
+    return ref.push(trip_dict).key
+
+def get_trip(direction, date, key):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}")
+    return ref.get()
+
+def get_trip_time(direction, date, key):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}")
+    return ref.child('Time').get()
+
+def get_trip_chat_id(direction, date, key):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}")
+    return ref.child('Chat ID').get()
