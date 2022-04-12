@@ -19,13 +19,18 @@ logger = logging.getLogger(__name__)
 def config(update, context):
     """Gives options for changing the user configuration"""
     if is_registered(update.effective_chat.id):
+        # Check if command was previously called and remove reply markup associated
+        if 'config_message' in context.user_data:
+            sent_message = context.user_data.pop('config_message')
+            sent_message.edit_reply_markup(None)
+
         reply_markup = config_keyboard(update.effective_chat.id)
 
         text = f"Aquí puedes modificar la configuración asociada a tu cuenta\."
         text += f"\n\n Esta es tu configuración actual: \n"
         text += f"{get_formatted_user_config(update.effective_chat.id)} \n"
-        update.message.reply_text(text, reply_markup=reply_markup,
-                                  parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        context.user_data['config_message'] = update.message.reply_text(text,
+                reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return CONFIG_SELECT
     else:
         text = f"Antes de poder usar este comando debes registrarte con el comando /registro."
@@ -81,8 +86,7 @@ def change_name(update, context):
            f" mándame de nuevo tu nombre y apellidos."
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
-    context.user_data['option'] = 'name'
-    context.user_data['sent_message'] = query.message
+    context.user_data['config_option'] = 'name'
     return CHANGING_MESSAGE
 
 def config_slots(update, context):
@@ -109,7 +113,7 @@ def config_slots(update, context):
     text = "¿Cuántos asientos disponibles sueles ofertar?"
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
-    context.user_data['option'] = 'slots'
+    context.user_data['config_option'] = 'slots'
     return CHANGING_SLOTS
 
 def config_bizum(update, context):
@@ -130,7 +134,7 @@ def config_bizum(update, context):
     text = "Indica si aceptas Bizum como forma de pago o no."
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
-    context.user_data['option'] = 'bizum'
+    context.user_data['config_option'] = 'bizum'
     return CHANGING_BIZUM
 
 def change_car(update, context):
@@ -140,11 +144,10 @@ def change_car(update, context):
     keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK")]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    text = ("Escribe la descripción actualizada de tu coche.")
+    text = "Escribe la descripción actualizada de tu coche."
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
-    context.user_data['option'] = 'car'
-    context.user_data['sent_message'] = query.message
+    context.user_data['config_option'] = 'car'
     return CHANGING_MESSAGE
 
 def change_fee(update, context):
@@ -157,8 +160,7 @@ def change_fee(update, context):
     text = ("Escribe el precio del trayecto por pasajero (máximo 1,5€).")
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
-    context.user_data['option'] = 'fee'
-    context.user_data['sent_message'] = query.message
+    context.user_data['config_option'] = 'fee'
     return CHANGING_MESSAGE
 
 def change_role(update, context):
@@ -180,7 +182,7 @@ def change_role(update, context):
     text += f"\n¿Deseas continuar?"
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
-    context.user_data['option'] = 'role'
+    context.user_data['config_option'] = 'role'
     return CHOOSING_ADVANCED_OPTION
 
 def config_delete_account(update, context):
@@ -198,11 +200,11 @@ def config_delete_account(update, context):
     text += f"\n¿Deseas continuar?"
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
-    context.user_data['option'] = 'delete'
+    context.user_data['config_option'] = 'delete'
     return CHOOSING_ADVANCED_OPTION
 
 def update_user_property(update, context):
-    option = context.user_data.pop('option')
+    option = context.user_data.pop('config_option')
 
     text = ""
     if option == 'name':
@@ -225,8 +227,8 @@ def update_user_property(update, context):
             text = f"Precio del trayecto actualizado a {str(fee).replace('.',',')}€."
 
     # Remove possible inline keyboard from previous message
-    if 'sent_message' in context.user_data:
-        sent_message = context.user_data.pop('sent_message')
+    if 'config_message' in context.user_data:
+        sent_message = context.user_data.pop('config_message')
         sent_message.edit_reply_markup(None)
 
     reply_markup = config_keyboard(update.effective_chat.id)
@@ -234,8 +236,8 @@ def update_user_property(update, context):
     text += f"\n\n Esta es tu configuración actual: \n"
     text += get_formatted_user_config(update.effective_chat.id)
     text += f"\n\nPuedes seguir cambiando ajustes\."
-    update.message.reply_text(text, reply_markup=reply_markup,
-                              parse_mode=telegram.ParseMode.MARKDOWN_V2)
+    context.user_data['config_message'] = update.message.reply_text(text,
+        reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return CONFIG_SELECT
 
 def update_user_property_callback(update, context):
@@ -243,7 +245,7 @@ def update_user_property_callback(update, context):
     query.answer()
 
     text = ""
-    option = context.user_data.pop('option')
+    option = context.user_data.pop('config_option')
     if option == 'slots':
         set_slots(update.effective_chat.id, int(query.data))
         text = f"Número de asientos disponibles cambiado correctamente."
@@ -281,6 +283,12 @@ def config_end(update, context):
     """Ends configuration conversation."""
     query = update.callback_query
     query.answer()
+    if 'config_message' in context.user_data:
+        context.user_data.pop('config_message')
+    if 'config_option' in context.user_data:
+        context.user_data.pop('config_option')
+    if 'role' in context.user_data:
+        context.user_data.pop('role')
     query.edit_message_text(text="Asistente de configuración de cuenta terminado.")
     return ConversationHandler.END
 

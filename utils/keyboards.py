@@ -35,8 +35,14 @@ def config_keyboard(chat_id):
                  [InlineKeyboardButton("Terminar", callback_data="CONFIG_END")]]
     return InlineKeyboardMarkup(keyboard)
 
-def weekdays_keyboard():
+def weekdays_keyboard(ikbs_list=None):
     """Creates an inline keyboard with the following 7 days of the week.
+
+    Parameters
+    ----------
+    ikbs_list : List[List[telegram.InlineKeyboardButton]]
+        If not None, the buttons in this list will be added at the bottom of
+        the time picker keyboard
 
     Returns
     -------
@@ -61,8 +67,9 @@ def weekdays_keyboard():
                  InlineKeyboardButton(f"{weekdays_aux[5]} {day_string[5]}",
                                         callback_data=week_strings[5]),
                  InlineKeyboardButton(f"{weekdays_aux[6]} {day_string[6]}",
-                                        callback_data=week_strings[6])],
-                [InlineKeyboardButton("Abortar", callback_data="TRIP_ABORT")]]
+                                        callback_data=week_strings[6])]]
+    if ikbs_list:
+        keyboard += ikbs_list
     return InlineKeyboardMarkup(keyboard)
 
 def time_picker_keyboard(hour=None, minutes=None, ikbs_list=None):

@@ -2,7 +2,7 @@ import logging
 import re
 from data.database_api import (get_name, is_driver, get_slots, get_car,
                                 get_fee, get_bizum, get_trip)
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from pytz import timezone
 
 MAX_FEE = 1.5
@@ -23,7 +23,7 @@ def get_formatted_user_config(chat_id):
     Returns
     -------
     string
-        Formatted string with user's configuration.
+        Formatted string with user's configuration in Telegram's Markdown v2.
 
     """
     string = f"💬 *Nombre*: `{get_name(chat_id)}`"
@@ -44,8 +44,9 @@ def get_formatted_user_config(chat_id):
 
     return string
 
-def get_formatted_trip(direction, date, key):
-    """Generates a formatted string with the given trip.
+def get_formatted_trip(direction, date, key,
+        showDriver = True, showDir = True, showDate = True):
+    """c.
 
     Parameters
     ----------
@@ -59,18 +60,22 @@ def get_formatted_trip(direction, date, key):
     Returns
     -------
     string
-        Formatted string with trip's info.
+        Formatted string with trip's info in Telegram's Markdown v2.
 
     """
 
     trip_dict = get_trip(direction, date, key)
     time = trip_dict['Time']
-    driver = get_name(trip_dict['Chat ID'])
 
-    string = f"🧑 *Conductor*: `{driver}`"
-    string += f"\n📍 *Dirección*: `{direction[2:]}`"
-    string += f"\n📅 *Fecha*: `{date[8:10]}/{date[5:7]}`"
-    string += f"\n🕖 *Hora*: `{time}`"
+    string = ""
+    if showDriver:
+        driver = get_name(trip_dict['Chat ID'])
+        string += f"🧑 *Conductor*: `{driver}`\n"
+    if showDir:
+        string += f"📍 *Dirección*: `{direction[2:]}`\n"
+    if showDate:
+        string += f"📅 *Fecha*: `{date[8:10]}/{date[5:7]}`\n"
+    string += f"🕖 *Hora*: `{time}`"
 
     if 'Slots' in trip_dict:
         string += f"\n💺 *Asientos disponibles*: `{str(trip_dict['Slots'])}`"
@@ -78,6 +83,30 @@ def get_formatted_trip(direction, date, key):
         string += f"\n🪙 *Pago por trayecto*: `{str(trip_dict['Fee']).replace('.',',')}€`"
 
     return string
+
+def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None):
+    """Generates a formatted string with the offered trips in the
+    time range, or in the whole day if no times given.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    time_start : string
+        Range's start time with ISO format 'HH:MM'.
+    time_stop : string
+        Range's stop time with ISO format 'HH:MM'.
+
+    Returns
+    -------
+    string
+        Formatted string in Telegram's Markdown v2.
+
+    """
+
+    return "Esta sería una lista de viajes ofertados\."
 
 ## Parsing
 
@@ -204,3 +233,6 @@ def is_future_datetime(date, time):
     now = datetime.now(madrid).replace(tzinfo=None)
     input_datetime = datetime.fromisoformat(f"{date}T{time}")
     return input_datetime > now
+
+def is_greater_isotime(time1, time2):
+    return time.fromisoformat(time1) > time.fromisoformat(time2)

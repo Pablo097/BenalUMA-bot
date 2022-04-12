@@ -1,7 +1,7 @@
 import logging
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
-from data.database_api import add_user, add_driver, is_registered
+from data.database_api import add_user, add_driver, is_registered, is_driver
 
 REG_NAME, REG_USAGE, REG_SLOTS, REG_CAR = range(4)
 
@@ -21,6 +21,9 @@ def help(update, context):
 
         if is_registered(update.effective_chat.id):
             text += f"\n⚙️ /config - Accede a las opciones de configuración de tu cuenta."
+            if is_driver(update.effective_chat.id):
+                text += f"\n🏁 /nuevoviaje - Inicia el asistente para crear una nueva"\
+                        f" oferta de viaje."
         else:
             text += f"\n🔑 /registro - Comienza a usar BenalUMA registrándote en el sistema."
 
