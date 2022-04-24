@@ -1,7 +1,7 @@
-import logging
+import logging, math
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from data.database_api import is_driver
-from utils.common import weekdays_from_today, week_isoformats
+from utils.common import weekdays_from_today, week_isoformats, ccd, scd
 
 def config_keyboard(chat_id):
     """Creates an inline keyboard with the user configuration options.
@@ -42,7 +42,7 @@ def weekdays_keyboard(ikbs_list=None):
     ----------
     ikbs_list : List[List[telegram.InlineKeyboardButton]]
         If not None, the buttons in this list will be added at the bottom of
-        the time picker keyboard
+        the keyboard
 
     Returns
     -------
@@ -95,18 +95,18 @@ def time_picker_keyboard(hour=None, minutes=None, ikbs_list=None):
     if minutes==None:
         minutes = 0
 
-    hour_string = f"{hour:0>2}"
-    minutes_string = f"{minutes:0>2}"
-    cbd1 = "TIME_PICKER_"
-    cbd2 = f"_{hour_string}_{minutes_string}"
+    cbd = "TIME_PICKER"
+    hs = f"{hour:0>2}"
+    ms = f"{minutes:0>2}"
 
-    keyboard = [[InlineKeyboardButton("⬆️", callback_data=f"{cbd1}HOUR_UP{cbd2}"),
-                 InlineKeyboardButton("⬆️", callback_data=f"{cbd1}MINUTES_UP{cbd2}")],
-                [InlineKeyboardButton(hour_string, callback_data=f"{cbd1}IGNORE{cbd2}"),
-                 InlineKeyboardButton(minutes_string, callback_data=f"{cbd1}IGNORE{cbd2}")],
-                [InlineKeyboardButton("⬇️", callback_data=f"{cbd1}HOUR_DOWN{cbd2}"),
-                 InlineKeyboardButton("⬇️", callback_data=f"{cbd1}MINUTES_DOWN{cbd2}")],
-                [InlineKeyboardButton("Confirmar", callback_data=f"{cbd1}SELECTED{cbd2}")]]
+    keyboard = [
+        [InlineKeyboardButton("⬆️", callback_data=ccd(cbd,'HOUR_UP',hs,ms)),
+         InlineKeyboardButton("⬆️", callback_data=ccd(cbd,'MINUTES_UP',hs,ms))],
+        [InlineKeyboardButton(hs, callback_data=ccd(cbd,'IGNORE',hs,ms)),
+         InlineKeyboardButton(ms, callback_data=ccd(cbd,'IGNORE',hs,ms))],
+        [InlineKeyboardButton("⬇️", callback_data=ccd(cbd,'HOUR_DOWN',hs,ms)),
+         InlineKeyboardButton("⬇️", callback_data=ccd(cbd,'MINUTES_DOWN',hs,ms))],
+        [InlineKeyboardButton("Confirmar", callback_data=ccd(cbd,'SELECTED',hs,ms))]]
     if ikbs_list:
         keyboard += ikbs_list
     return InlineKeyboardMarkup(keyboard)
@@ -131,34 +131,30 @@ def time_picker_process(update, context, ikbs_list=None):
 
     """
     query = update.callback_query
-    data = query.data
+    data = scd(query.data)
 
-    if data.startswith('TIME_PICKER_'):
-        data = data[12:]
-    else:
+    if data[0] != 'TIME_PICKER':
         raise SyntaxError('This callback data does not belong to the time picker keyboard.')
 
-    if not data.startswith("IGNORE"):
-        time_string = data[-5:]
-        data = data[:-6]
-
-        hour, minutes = time_string.split('_')
+    command = data[1]
+    if command != "IGNORE":
+        hour, minutes = data[2:4]
         hour = int(hour)
         minutes = int(minutes)
         minutes_step = 5
 
-        if data == "SELECTED":
+        if command == "SELECTED":
             query.edit_message_reply_markup(None)
             return f"{hour:0>2}:{minutes:0>2}"
-        if data == "HOUR_UP":
+        if command == "HOUR_UP":
             hour += 1
-        elif data == "HOUR_DOWN":
+        elif command == "HOUR_DOWN":
             hour -= 1
-        elif data == "MINUTES_UP":
+        elif command == "MINUTES_UP":
             minutes += minutes_step
             if minutes>=60:
                 hour +=1
-        elif data == "MINUTES_DOWN":
+        elif command == "MINUTES_DOWN":
             minutes -= minutes_step
             if minutes<0:
                 hour -=1
@@ -168,3 +164,39 @@ def time_picker_process(update, context, ikbs_list=None):
         query.edit_message_reply_markup(time_picker_keyboard(hour, minutes, ikbs_list))
 
     return
+
+def trip_ids_keyboard(key_list, ikbs_list=None):
+    """Creates an inline keyboard with numbered buttons that return the trip IDs.
+
+    Parameters
+    ----------
+    key_list : List[strings]
+        List with the strings of the trips' IDs.
+    ikbs_list : List[List[telegram.InlineKeyboardButton]]
+        If not None, the buttons in this list will be added at the bottom of
+        the time picker keyboard
+
+    Returns
+    -------
+    InlineKeyboardMarkup
+        The keyboard whose callback datas are the trips' IDs.
+
+    """
+    n_rows = math.ceil(len(key_list)/4)
+    n_cols = math.ceil(len(key_list)/n_rows)
+    index = 0
+    cbd = 'TRIP_ID'
+    keyboard = []
+    for i in range(n_rows):
+        row = []
+        for j in range(n_cols):
+            if index==len(key_list):
+                continue
+            row.append(InlineKeyboardButton(str(index+1),
+                                callback_data=ccd(cbd,key_list[index])))
+            index += 1
+        keyboard.append(row)
+
+    if ikbs_list:
+        keyboard += ikbs_list
+    return InlineKeyboardMarkup(keyboard)

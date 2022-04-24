@@ -2,6 +2,8 @@ import firebase_admin
 from firebase_admin import db
 import json
 from datetime import datetime
+from utils.common import week_isoformats
+from collections import OrderedDict
 
 # General
 
@@ -10,7 +12,7 @@ def add_user(chat_id, username):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id of the user.
     username : str
         The given username.
@@ -28,7 +30,7 @@ def is_registered(chat_id):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to check.
 
     Returns
@@ -45,7 +47,7 @@ def get_name(chat_id):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to check
 
     Returns
@@ -62,7 +64,7 @@ def set_name(chat_id, name):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to check
     name: string
         The name for the user
@@ -81,7 +83,7 @@ def delete_user(chat_id):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to delete.
 
     Returns
@@ -102,7 +104,7 @@ def add_driver(chat_id, slots, car):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to add.
     slots : int
         Number of available seats, excluding the driver.
@@ -124,7 +126,7 @@ def is_driver(chat_id):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to check.
 
     Returns
@@ -142,7 +144,7 @@ def delete_driver(chat_id):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to delete.
 
     Returns
@@ -152,16 +154,16 @@ def delete_driver(chat_id):
     """
 
     db.reference(f"/Drivers/{str(chat_id)}").delete()
-    # TODO: Delete all possible planned trips
-    # (inside delete_trip function, alert possible passengers that the
-    # trip has been cancelled)
+    delete_all_trips_by_driver(chat_id)
+    # Note: All passengers from deteled trips should be noticed about the deletion
+    # Maybe do that outside the DB functions, as DB does not need to know about that
 
 def get_slots(chat_id):
     """Gets the number of slots of a driver.
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to check.
 
     Returns
@@ -179,7 +181,7 @@ def set_slots(chat_id, slots):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id of the driver.
     slots : int
         Number of available seats, excluding the driver.
@@ -197,7 +199,7 @@ def get_car(chat_id):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to check.
 
     Returns
@@ -215,7 +217,7 @@ def set_car(chat_id, car):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id of the driver.
     car : str
         Description of the car.
@@ -233,7 +235,7 @@ def get_fee(chat_id):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to check.
 
     Returns
@@ -255,7 +257,7 @@ def set_fee(chat_id, fee):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id of the driver.
     fee : float
         The driver's fee.
@@ -273,7 +275,7 @@ def get_bizum(chat_id):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id to check.
 
     Returns
@@ -297,7 +299,7 @@ def set_bizum(chat_id, bizum_pref):
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or string
         The chat_id of the driver.
     bizum_pref : boolean
         True for indicating that Bizum is accepted, False otherwise.
@@ -325,7 +327,7 @@ def add_trip(direction, chat_id, date, time, time_window = 0,
     ----------
     direction : string
         Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
-    chat_id : int
+    chat_id : int or string
         The chat_id of the driver.
     date : string
         Departure date with ISO format 'YYYY-mm-dd'
@@ -362,9 +364,53 @@ def add_trip(direction, chat_id, date, time, time_window = 0,
     if fee != None:
         trip_dict['Fee'] = fee
 
-    return ref.push(trip_dict).key
+    key = ref.push(trip_dict).key
+
+    # Now add the key to the driver's offers section
+    ref = db.reference(f"/Drivers/{chat_id}/Offers/{direction}/{date}/{key}")
+    ref.set(True)
+
+    return key
+
+def delete_trip(direction, date, key):
+    """Deletes a trip.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the trip.
+
+    Returns
+    -------
+    None
+
+    """
+    chat_id = get_trip_chat_id(direction, date, key)
+    db.reference(f"/Trips/{direction}/{date}/{key}").delete()
+    db.reference(f"/Drivers/{chat_id}/Offers/{direction}/{date}/{key}").delete()
 
 def get_trip(direction, date, key):
+    """Gets a dictionary with the given trip info.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the trip.
+
+    Returns
+    -------
+    dict
+        Trip information.
+
+    """
     ref = db.reference(f"/Trips/{direction}/{date}/{key}")
     return ref.get()
 
@@ -375,3 +421,246 @@ def get_trip_time(direction, date, key):
 def get_trip_chat_id(direction, date, key):
     ref = db.reference(f"/Trips/{direction}/{date}/{key}")
     return ref.child('Chat ID').get()
+
+def get_trips_by_date_range(direction, date, time_start=None, time_end=None):
+    """Gets a dictionary with the offered trips for a given date and,
+    optionally, time range
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    time_start : string
+        Sooner departure time to search for, with ISO format 'HH:MM'.
+    time_end : string
+        Latest departure time to search for, with ISO format 'HH:MM'.
+
+    Returns
+    -------
+    dict
+        Dictionary with found trips. It has the following format:
+        {'trip_unique_key_1': <dict with trip info 1>,
+         'trip_unique_key_2': <dict with trip info 2>,
+         ...}
+
+    """
+    ref = db.reference(f"/Trips/{direction}/{date}/")
+    query = ref.order_by_child("Time")
+
+    if time_start:
+        query = query.start_at(time_start)
+    if time_end:
+        query = query.end_at(time_end)
+
+    return query.get()
+
+def get_trips_by_driver(chat_id):
+    """Return a dictionary with all the planned trips for a given driver for
+    the next week from today.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the driver.
+
+    Returns
+    -------
+    dict
+        Dictionary with the planned trips.
+
+    """
+    ref = db.reference(f"/Drivers/{chat_id}/Offers")
+    trip_keys_dict = ref.get()
+    trips_dict = dict()
+
+    if trip_keys_dict:
+        for dir in trip_keys_dict:
+            dir_trips = dict()
+            for date in trip_keys_dict[dir]:
+                date_trips = dict()
+                for key in trip_keys_dict[dir][date]:
+                    date_trips[key] = get_trip(dir, date, key)
+                if date_trips:
+                    dir_trips[date] = OrderedDict(sorted(date_trips.items(), key=lambda x: x[1]['Time']))
+            if dir_trips:
+                trips_dict[dir] = dir_trips
+
+    if trips_dict:
+        return trips_dict
+
+    return
+
+    # # OLD IMPLEMENTATION
+    # ref = db.reference("/Trips/")
+    # all_trips = dict()
+    # for dir in ['toBenalmadena', 'toUMA']:
+    #     dir_trips = dict()
+    #     ref2 = ref.child(dir)
+    #
+    #     for date in week_isoformats():
+    #         db_query = ref2.child(date).order_by_child('Chat ID')
+    #         day_trips_dict = db_query.equal_to(chat_id).get()
+    #         if day_trips_dict:
+    #             dir_trips[date] = day_trips_dict
+    #
+    #     if dir_trips:
+    #         all_trips[dir] = dir_trips
+    #
+    # if all_trips:
+    #     return all_trips
+    #
+    # return
+
+def get_trips_by_passenger(chat_id):
+    """Return a dictionary with all the reserved trips for a given user for
+    the next week from today.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user.
+
+    Returns
+    -------
+    dict
+        Dictionary with the reserved trips.
+
+    """
+    ref = db.reference(f"/Passengers/{chat_id}")
+    trip_keys_dict = ref.get()
+    trips_dict = dict()
+
+    if trip_keys_dict:
+        for dir in trip_keys_dict:
+            dir_trips = dict()
+            for date in trip_keys_dict[dir]:
+                date_trips = dict()
+                for key in trip_keys_dict[dir][date]:
+                    date_trips[key] = get_trip(dir, date, key)
+                if date_trips:
+                    dir_trips[date] = OrderedDict(sorted(date_trips.items(), key=lambda x: x[1]['Time']))
+            if dir_trips:
+                trips_dict[dir] = dir_trips
+
+    if trips_dict:
+        return trips_dict
+
+    return
+
+def delete_all_trips_by_driver(chat_id):
+    """Deletes all the planned trips for a given driver.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the driver.
+
+    Returns
+    -------
+    None
+
+    """
+    ref = db.reference(f"/Drivers/{chat_id}/Offers")
+    trips_dict = ref.get()
+    if trips_dict:
+        for dir in trips_dict:
+            for date in trips_dict[dir]:
+                for trip_key in trips_dict[dir][date]:
+                    delete_trip(dir, date, trip_key)
+
+def add_passenger(chat_id, direction, date, key):
+    """Add passenger given by chat_id to the specified trip.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user to add as passenger.
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the trip.
+
+    Returns
+    -------
+    Boolean
+        True if the user was added correctly.
+
+    """
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Passengers")
+    passenger_dict = ref.get()
+
+    if passenger_dict:
+        ref.update({chat_id: True})
+    else:
+        passenger_dict = {chat_id: True}
+        ref.set(passenger_dict)
+
+    # Now add it to the passenger's own list of reserved trips
+    ref = db.reference(f"/Passengers/{chat_id}/{direction}/{date}/{key}")
+    ref.set(True)
+
+    return True
+
+def is_passenger(chat_id, direction, date, key):
+    """Checks whether user is already a passenger in the trip.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user to remove from passengers list.
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the trip.
+
+    Returns
+    -------
+    boolean
+        True if user is passenger already, False otherwise.
+
+    """
+    ref = db.reference(f"/Passengers/{chat_id}/{direction}/{date}/{key}")
+    if ref.get():
+        return True
+    else:
+        return False
+
+def remove_passenger(chat_id, direction, date, key):
+    """Remove passenger given by chat_id to the specified trip.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user to remove from passengers list.
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the trip.
+
+    Returns
+    -------
+    Boolean
+        True if the user was removed correctly.
+        False if the user was not a passenger in this trip.
+
+    """
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Passengers")
+    passenger_dict = ref.get()
+
+    if passenger_dict and str(chat_id) in passenger_dict:
+        ref.child(str(chat_id)).delete()
+    else:
+        return False
+
+    # Now delete it from the passenger's own list of reserved trips
+    db.reference(f"/Passengers/{chat_id}/{direction}/{date}/{key}").delete()
+
+    return True

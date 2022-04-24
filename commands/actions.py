@@ -21,6 +21,7 @@ def help(update, context):
 
         if is_registered(update.effective_chat.id):
             text += f"\n⚙️ /config - Accede a las opciones de configuración de tu cuenta."
+            text += f"\n📚 /verofertas - Mostrar viajes ofertados que cumplan los criterios indicados."
             if is_driver(update.effective_chat.id):
                 text += f"\n🏁 /nuevoviaje - Inicia el asistente para crear una nueva"\
                         f" oferta de viaje."

@@ -9,6 +9,8 @@ from data.database_api import (is_registered, is_driver, set_name, set_car,
                                 delete_driver, delete_user)
 from utils.keyboards import config_keyboard
 from utils.common import *
+from utils.format import get_formatted_user_config
+from utils.decorators import registered
 import re
 
 (CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE,
@@ -16,26 +18,22 @@ import re
 
 logger = logging.getLogger(__name__)
 
+@registered
 def config(update, context):
     """Gives options for changing the user configuration"""
-    if is_registered(update.effective_chat.id):
-        # Check if command was previously called and remove reply markup associated
-        if 'config_message' in context.user_data:
-            sent_message = context.user_data.pop('config_message')
-            sent_message.edit_reply_markup(None)
+    # Check if command was previously called and remove reply markup associated
+    if 'config_message' in context.user_data:
+        sent_message = context.user_data.pop('config_message')
+        sent_message.edit_reply_markup(None)
 
-        reply_markup = config_keyboard(update.effective_chat.id)
+    reply_markup = config_keyboard(update.effective_chat.id)
 
-        text = f"Aquí puedes modificar la configuración asociada a tu cuenta\."
-        text += f"\n\n Esta es tu configuración actual: \n"
-        text += f"{get_formatted_user_config(update.effective_chat.id)} \n"
-        context.user_data['config_message'] = update.message.reply_text(text,
-                reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN_V2)
-        return CONFIG_SELECT
-    else:
-        text = f"Antes de poder usar este comando debes registrarte con el comando /registro."
-        update.message.reply_text(text)
-        return ConversationHandler.END
+    text = f"Aquí puedes modificar la configuración asociada a tu cuenta\."
+    text += f"\n\n Esta es tu configuración actual: \n"
+    text += f"{get_formatted_user_config(update.effective_chat.id)} \n"
+    context.user_data['config_message'] = update.message.reply_text(text,
+            reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+    return CONFIG_SELECT
 
 def config_restart(update, context):
     """Gives options for changing the user configuration"""

@@ -1,7 +1,5 @@
 import logging
 import re
-from data.database_api import (get_name, is_driver, get_slots, get_car,
-                                get_fee, get_bizum, get_trip)
 from datetime import datetime, date, timedelta, time
 from pytz import timezone
 
@@ -9,104 +7,6 @@ MAX_FEE = 1.5
 
 emoji_numbers = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-
-## Formatted outputs
-
-def get_formatted_user_config(chat_id):
-    """Generates a formatted string with the user configuration.
-
-    Parameters
-    ----------
-    chat_id : int
-        The chat_id to check.
-
-    Returns
-    -------
-    string
-        Formatted string with user's configuration in Telegram's Markdown v2.
-
-    """
-    string = f"💬 *Nombre*: `{get_name(chat_id)}`"
-    role = 'Conductor' if is_driver(chat_id) else 'Pasajero'
-    string += f"\n🧍 *Rol*: `{role}`"
-
-    if role == 'Conductor':
-        string += f"\n💺 *Asientos disponibles*: `{str(get_slots(chat_id))}`"
-        string += f"\n🚘 *Descripción vehículo*: `{get_car(chat_id)}`"
-        fee = get_fee(chat_id)
-        if fee != None:
-            string += f"\n🪙 *Pago por trayecto*: `{str(fee).replace('.',',')}€`"
-        bizum = get_bizum(chat_id)
-        if bizum == True:
-            string += f"\n💸 `Aceptas Bizum`"
-        elif bizum == False:
-            string += f"\n💸🚫 `NO aceptas Bizum`"
-
-    return string
-
-def get_formatted_trip(direction, date, key,
-        showDriver = True, showDir = True, showDate = True):
-    """c.
-
-    Parameters
-    ----------
-    direction : string
-        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
-    date : string
-        Departure date with ISO format 'YYYY-mm-dd'
-    key : type
-        Unique key of the trip in the DB.
-
-    Returns
-    -------
-    string
-        Formatted string with trip's info in Telegram's Markdown v2.
-
-    """
-
-    trip_dict = get_trip(direction, date, key)
-    time = trip_dict['Time']
-
-    string = ""
-    if showDriver:
-        driver = get_name(trip_dict['Chat ID'])
-        string += f"🧑 *Conductor*: `{driver}`\n"
-    if showDir:
-        string += f"📍 *Dirección*: `{direction[2:]}`\n"
-    if showDate:
-        string += f"📅 *Fecha*: `{date[8:10]}/{date[5:7]}`\n"
-    string += f"🕖 *Hora*: `{time}`"
-
-    if 'Slots' in trip_dict:
-        string += f"\n💺 *Asientos disponibles*: `{str(trip_dict['Slots'])}`"
-    if 'Fee' in trip_dict:
-        string += f"\n🪙 *Pago por trayecto*: `{str(trip_dict['Fee']).replace('.',',')}€`"
-
-    return string
-
-def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None):
-    """Generates a formatted string with the offered trips in the
-    time range, or in the whole day if no times given.
-
-    Parameters
-    ----------
-    direction : string
-        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
-    date : string
-        Departure date with ISO format 'YYYY-mm-dd'.
-    time_start : string
-        Range's start time with ISO format 'HH:MM'.
-    time_stop : string
-        Range's stop time with ISO format 'HH:MM'.
-
-    Returns
-    -------
-    string
-        Formatted string in Telegram's Markdown v2.
-
-    """
-
-    return "Esta sería una lista de viajes ofertados\."
 
 ## Parsing
 
@@ -154,6 +54,18 @@ def obtain_time_from_string(text):
     else:
         time_string += f"{time[1]:0>2}"
     return time_string
+
+# Callback data handling
+
+def ccd(*args):
+    """ CCD: Create Callback Data.
+    Creates a string of the passed arguments separated by semicolons"""
+    return ";".join(str(i) for i in args)
+
+def scd(data):
+    """ SCD: Separate Callback Data.
+    Returns a list of the separated data created with 'create_callback_data'"""
+    return [i for i in data.split(";")]
 
 ## Dates handling
 
