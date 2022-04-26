@@ -422,6 +422,10 @@ def get_trip_chat_id(direction, date, key):
     ref = db.reference(f"/Trips/{direction}/{date}/{key}")
     return ref.child('Chat ID').get()
 
+def get_trip_slots(direction, date, key):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}")
+    return ref.child('Slots').get()
+
 def get_trips_by_date_range(direction, date, time_start=None, time_end=None):
     """Gets a dictionary with the offered trips for a given date and,
     optionally, time range
@@ -591,13 +595,13 @@ def add_passenger(chat_id, direction, date, key):
 
     """
     ref = db.reference(f"/Trips/{direction}/{date}/{key}/Passengers")
-    passenger_dict = ref.get()
+    passengers_dict = ref.get()
 
-    if passenger_dict:
+    if passengers_dict:
         ref.update({chat_id: True})
     else:
-        passenger_dict = {chat_id: True}
-        ref.set(passenger_dict)
+        passengers_dict = {chat_id: True}
+        ref.set(passengers_dict)
 
     # Now add it to the passenger's own list of reserved trips
     ref = db.reference(f"/Passengers/{chat_id}/{direction}/{date}/{key}")
@@ -631,6 +635,31 @@ def is_passenger(chat_id, direction, date, key):
     else:
         return False
 
+def get_number_of_passengers(direction, date, key):
+    """Returns the number of confirmed passengers in a trip.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the trip.
+
+    Returns
+    -------
+    integer
+        Number of passengers in the trip.
+
+    """
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Passengers")
+    passengers_dict = ref.get()
+    if passengers_dict:
+        return len(passengers_dict)
+    else:
+        return 0
+
 def remove_passenger(chat_id, direction, date, key):
     """Remove passenger given by chat_id to the specified trip.
 
@@ -653,9 +682,9 @@ def remove_passenger(chat_id, direction, date, key):
 
     """
     ref = db.reference(f"/Trips/{direction}/{date}/{key}/Passengers")
-    passenger_dict = ref.get()
+    passengers_dict = ref.get()
 
-    if passenger_dict and str(chat_id) in passenger_dict:
+    if passengers_dict and str(chat_id) in passengers_dict:
         ref.child(str(chat_id)).delete()
     else:
         return False
