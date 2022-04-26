@@ -8,7 +8,7 @@ from utils.common import *
 from utils.format import get_formatted_trip_for_passenger, get_formatted_trip_for_driver
 from data.database_api import get_trip, get_slots, add_passenger
 
-def alert_user(context, update):
+def alert_user(update, context):
     query = update.callback_query
     query.answer()
 

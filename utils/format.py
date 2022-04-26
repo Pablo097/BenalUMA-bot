@@ -87,8 +87,14 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
     if fee:
         string += f"🪙 *Precio*: `{str(fee).replace('.',',')}€`\n"
     if passenger_ids:
-        passenger_strings = [f"[{escape_markdown(get_name(id),2)}](tg://user?id={str(id)})"
-                                                    for id in passenger_ids]
+        # passenger_strings = [f"[{escape_markdown(get_name(id),2)}](tg://user?id={str(id)})"
+        #                                             for id in passenger_ids]
+        passenger_strings = []
+        for id in passenger_ids:
+            name = get_name(id)
+            if not name:
+                name = str(id)
+            passenger_strings.append(f"[{escape_markdown(name,2)}](tg://user?id={id})")
         string += f"👥 *Pasajeros aceptados*: {', '.join(passenger_strings)}\n"
 
     if string:
