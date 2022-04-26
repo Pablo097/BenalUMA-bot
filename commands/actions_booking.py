@@ -198,11 +198,11 @@ def SO_reserve(update, context):
     text_driver = escape_markdown(f"🛎️ Tienes una nueva petición de reserva:\n\n",2)
     text_driver += get_formatted_trip_for_driver(dir, date, trip_key)
 
-    cbd = 'ALERT_USER'
+    cbd = 'ALERT'
     driver_keyboard = [[InlineKeyboardButton("✅ Confirmar",
-                callback_data=ccd(cbd, 'CONFIRM', user_id, dir, date, trip_key)),
+                callback_data=ccd(cbd, 'Y', user_id, dir[2:5], date, trip_key)),
                         InlineKeyboardButton("❌ Rechazar",
-                callback_data=ccd(cbd, 'REJECT', user_id, dir, date, trip_key))]]
+                callback_data=ccd(cbd, 'N', user_id, dir[2:5], date, trip_key))]]
     try:
         context.bot.send_message(driver_id, text_driver,
                                 reply_markup=InlineKeyboardMarkup(driver_keyboard),
@@ -255,13 +255,17 @@ def alert_user(update, context):
 
     driver_id = update.effective_chat.id
     data = scd(query.data)
-    if data[0] != 'ALERT_USER':
+    if data[0] != 'ALERT':
         raise SyntaxError('This callback data does not belong to the alert_user function.')
 
     action, user_id, dir, date = data[1:5]
     trip_key = ';'.join(data[5:])   # Just in case the unique ID constains a ';'
+    if dir == 'Ben':
+        dir = 'toBenalmadena'
+    elif dir == 'UMA':
+        dir = 'toUMA'
 
-    if action == "CONFIRM":
+    if action == "Y":
         if is_passenger(user_id, dir, date, trip_key):
             text = f"⚠️ No puedes aceptar a este usuario porque ya es un"\
                    f" pasajero confirmado para este viaje."
@@ -288,7 +292,7 @@ def alert_user(update, context):
                               f"conductor pulsando sobre su nombre si quieres "\
                               f"preguntarle sobre la disponibilidad.\n\n"
 
-    elif action == "REJECT":
+    elif action == "N":
         text = escape_markdown("🚫 Has rechazado la petición de reserva.",2)
         text_booker = f"❌ Tu petición de reserva para el siguiente viaje ha"\
                       f" sido rechazada.\n\n"
@@ -340,4 +344,4 @@ def add_handlers(dispatcher):
     dispatcher.add_handler(SO_conv_handler)
 
     # Create Callback Query handler for 'alert user'
-    dispatcher.add_handler(CallbackQueryHandler(alert_user, pattern='^ALERT_USER.*'))
+    dispatcher.add_handler(CallbackQueryHandler(alert_user, pattern='^ALERT.*'))

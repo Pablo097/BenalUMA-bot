@@ -1,5 +1,4 @@
-import logging
-import telegram
+import logging, telegram, re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
@@ -11,7 +10,6 @@ from utils.keyboards import config_keyboard
 from utils.common import *
 from utils.format import get_formatted_user_config
 from utils.decorators import registered
-import re
 
 (CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE,
     CHANGING_SLOTS, CHANGING_BIZUM, CHOOSING_ADVANCED_OPTION) = range(6)
