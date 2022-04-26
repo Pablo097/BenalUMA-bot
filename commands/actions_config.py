@@ -173,7 +173,9 @@ def change_role(update, context):
     text = f"Vas a cambiar tu rol habitual a {role}."
     if role=='Pasajero':
         text += f"\n⚠️ Si haces esto se borrarán todos tus viajes ofertados y"\
-                f" tu configuración como conductor."
+                f" tu configuración como conductor.\nSi simplemente quieres pedir"\
+                f" coche tú, recuerda que puedes hacerlo aun estando configurado"\
+                f" como conductor."
     elif role=='Conductor':
         text += f"\n🚗 Haz esto si piensas empezar a ofertar viajes con tu coche."\
                 f" Se te dará acceso a ajustes adicionales para conductores."
@@ -217,6 +219,7 @@ def update_user_property(update, context):
         except:
             fee = -1
         if not (fee>=0 and fee<=MAX_FEE):
+            context.user_data['config_option'] = 'fee'
             text = f"Por favor, introduce un número entre 0 y {str(MAX_FEE).replace('.',',')}."
             update.message.reply_text(text)
             return CHANGING_MESSAGE
@@ -260,9 +263,15 @@ def update_user_property_callback(update, context):
                    f" configura correctamente al menos tu número de asientos y"\
                    f" la descripción de tu coche."
         elif role=='Pasajero':
+            # TODO: Notify first all users who are accepted passengers of their
+            # trips, remove them from the trips and then delete the user along with
+            # all their trips
             delete_driver(update.effective_chat.id)
             text = f"Rol cambiado a pasajero correctamente."
     elif option == 'delete':
+        # TODO: Notify first all users who are accepted passengers of their
+        # trips, remove them from the trips and then delete the user along with
+        # all their trips
         delete_user(update.effective_chat.id)
         text = f"Tu cuenta se ha eliminado correctamente. \n¡Que te vaya bien! 🖖"
         query.edit_message_text(text)
