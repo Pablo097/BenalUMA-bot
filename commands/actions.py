@@ -1,4 +1,4 @@
-import logging
+import logging, telegram
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
 from data.database_api import add_user, add_driver, is_registered, is_driver
@@ -25,6 +25,8 @@ def help(update, context):
             if is_driver(update.effective_chat.id):
                 text += f"\n🏁 /nuevoviaje - Inicia el asistente para crear una nueva"\
                         f" oferta de viaje."
+                text += f"\n📆 /misviajes - Muestra los viajes que tienes ofertados"\
+                        f" para esta semana."
         else:
             text += f"\n🔑 /registro - Comienza a usar BenalUMA registrándote en el sistema."
 
@@ -72,6 +74,16 @@ def register_usage(update, context):
     else:
         text = f"Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
         update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
+        text = f"Un aviso antes de que empieces a ofertar/reservar viajes:\nEste"\
+               f" bot necesita poder enlazar a tu perfil para que los demás"\
+               f" usuarios puedan contactar contigo por privado en caso de que"\
+               f" sea necesario (por ejemplo, para tratar detalles más específi"\
+               f"cos del trayecto).\nPara asegurarte de que el bot puede hacerlo"\
+               f" correctamente, por favor, comprueba que en los ajustes de Telegram,"\
+               f" en **'Privacidad y Seguridad' > 'Mensajes reenviados'**, tengas"\
+               f" marcada la opción __Todos__ o, al menos, añadas este bot como "\
+               f" excepción.\n¡Buen viaje! "
+        update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return ConversationHandler.END
 
 def register_slots(update, context):

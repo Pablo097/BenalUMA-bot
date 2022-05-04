@@ -460,14 +460,21 @@ def get_trips_by_date_range(direction, date, time_start=None, time_end=None):
 
     return query.get()
 
-def get_trips_by_driver(chat_id):
-    """Return a dictionary with all the planned trips for a given driver for
-    the next week from today.
+def get_trips_by_driver(chat_id, date_start=None, date_end=None, order_by_date=False):
+    """Return a dictionary with all the planned trips for a given driver
+    between the given dates.
 
     Parameters
     ----------
     chat_id : int or string
         chat_id of the driver.
+    date_start : string
+        Range's start date with ISO format 'YYYY-mm-dd'. Optional
+    date_end : string
+        Range's stop date with ISO format 'YYYY-mm-dd'. Optional
+    order_by_date : boolean
+        Flag which indicates whether to order the trips by date instead of by
+        direction. If True, each trip contains a 'Direction' field. False by default.
 
     Returns
     -------
@@ -476,24 +483,50 @@ def get_trips_by_driver(chat_id):
 
     """
     ref = db.reference(f"/Drivers/{chat_id}/Offers")
-    trip_keys_dict = ref.get()
     trips_dict = dict()
 
-    if trip_keys_dict:
-        for dir in trip_keys_dict:
+    for dir in ['toBenalmadena', 'toUMA']:
+        query = ref.child(dir).order_by_key()
+        if date_start:
+            query = query.start_at(date_start)
+        if date_end:
+            query = query.end_at(date_end)
+
+        trip_keys_dict = query.get()
+        if trip_keys_dict:
             dir_trips = dict()
-            for date in trip_keys_dict[dir]:
+            for date in trip_keys_dict:
                 date_trips = dict()
-                for key in trip_keys_dict[dir][date]:
+                for key in trip_keys_dict[date]:
                     date_trips[key] = get_trip(dir, date, key)
                 if date_trips:
-                    dir_trips[date] = OrderedDict(sorted(date_trips.items(), key=lambda x: x[1]['Time']))
+                    dir_trips[date] = OrderedDict(
+                            sorted(date_trips.items(), key=lambda x: x[1]['Time']))
             if dir_trips:
                 trips_dict[dir] = dir_trips
 
     if trips_dict:
+        if order_by_date:
+            trips_dict_by_date = dict()
+            dates = set()
+            # First narrow down the dates to process
+            for dir in trips_dict:
+                dates = dates.union(set(trips_dict[dir]))
+            # We want to present the trips by date
+            for date in sorted(dates):
+                date_trips = dict()
+                for dir in trips_dict:
+                    if date in trips_dict[dir]:
+                        # Save the direction of each trip in an specific field
+                        for key in trips_dict[dir][date]:
+                            trips_dict[dir][date][key]['Direction'] = dir
+                        date_trips.update(trips_dict[dir][date])
+                # Order dict by time if it exists
+                if date_trips:
+                    trips_dict_by_date[date] = OrderedDict(
+                            sorted(date_trips.items(), key=lambda x: x[1]['Time']))
+            return trips_dict_by_date
         return trips_dict
-
     return
 
     # # OLD IMPLEMENTATION
@@ -517,14 +550,21 @@ def get_trips_by_driver(chat_id):
     #
     # return
 
-def get_trips_by_passenger(chat_id):
-    """Return a dictionary with all the reserved trips for a given user for
-    the next week from today.
+def get_trips_by_passenger(chat_id, date_start=None, date_end=None, order_by_date=False):
+    """Return a dictionary with all the reserved trips for a given user between
+    the given dates.
 
     Parameters
     ----------
     chat_id : int or string
         chat_id of the user.
+    date_start : string
+        Range's start date with ISO format 'YYYY-mm-dd'. Optional
+    date_end : string
+        Range's stop date with ISO format 'YYYY-mm-dd'. Optional
+    order_by_date : boolean
+        Flag which indicates whether to order the trips by date instead of by
+        direction. If True, each trip contains a 'Direction' field. False by default.
 
     Returns
     -------
@@ -533,15 +573,21 @@ def get_trips_by_passenger(chat_id):
 
     """
     ref = db.reference(f"/Passengers/{chat_id}")
-    trip_keys_dict = ref.get()
     trips_dict = dict()
 
-    if trip_keys_dict:
-        for dir in trip_keys_dict:
+    for dir in ['toBenalmadena', 'toUMA']:
+        query = ref.child(dir).order_by_key()
+        if date_start:
+            query = query.start_at(date_start)
+        if date_end:
+            query = query.end_at(date_end)
+
+        trip_keys_dict = query.get()
+        if trip_keys_dict:
             dir_trips = dict()
-            for date in trip_keys_dict[dir]:
+            for date in trip_keys_dict:
                 date_trips = dict()
-                for key in trip_keys_dict[dir][date]:
+                for key in trip_keys_dict[date]:
                     date_trips[key] = get_trip(dir, date, key)
                 if date_trips:
                     dir_trips[date] = OrderedDict(sorted(date_trips.items(), key=lambda x: x[1]['Time']))
@@ -549,8 +595,27 @@ def get_trips_by_passenger(chat_id):
                 trips_dict[dir] = dir_trips
 
     if trips_dict:
+        if order_by_date:
+            trips_dict_by_date = dict()
+            dates = set()
+            # First narrow down the dates to process
+            for dir in trips_dict:
+                dates = dates.union(set(trips_dict[dir]))
+            # We want to present the trips by date
+            for date in dates:
+                date_trips = dict()
+                for dir in trips_dict:
+                    if date in trips_dict[dir]:
+                        # Save the direction of each trip in an specific field
+                        for key in trips_dict[dir][date]:
+                            trips_dict[dir][date][key]['Direction'] = dir
+                        date_trips.update(trips_dict[dir][date])
+                # Order dict by time if it exists
+                if date_trips:
+                    trips_dict_by_date[date] = OrderedDict(
+                            sorted(date_trips.items(), key=lambda x: x[1]['Time']))
+            return trips_dict_by_date
         return trips_dict
-
     return
 
 def delete_all_trips_by_driver(chat_id):
@@ -634,6 +699,31 @@ def is_passenger(chat_id, direction, date, key):
         return True
     else:
         return False
+
+def get_trip_passengers(direction, date, key):
+    """Returns the list of confirmed passengers in a trip.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the trip.
+
+    Returns
+    -------
+    list
+        List with the chat IDs of the passengers, if any
+
+    """
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Passengers")
+    passengers_dict = ref.get()
+    if passengers_dict:
+        return list(passengers_dict)
+    else:
+        return list()
 
 def get_number_of_passengers(direction, date, key):
     """Returns the number of confirmed passengers in a trip.

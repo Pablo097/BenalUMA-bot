@@ -1,16 +1,23 @@
 import logging
 import re
 from data.database_api import (get_name, is_driver, get_slots, get_car,
-                                get_fee, get_bizum, get_trip, get_trips_by_date_range)
+                               get_fee, get_bizum, get_trip,
+                               get_trips_by_date_range, get_trips_by_driver)
 from telegram.utils.helpers import escape_markdown
 from utils.common import *
+
+def get_markdown2_inline_mention(chat_id):
+    name = get_name(chat_id)
+    if not name:
+        name = str(chat_id)
+    return f"[{escape_markdown(name,2)}](tg://user?id={chat_id})"
 
 def get_formatted_user_config(chat_id):
     """Generates a formatted string with the user configuration.
 
     Parameters
     ----------
-    chat_id : int
+    chat_id : int or str
         The chat_id to check.
 
     Returns
@@ -28,17 +35,18 @@ def get_formatted_user_config(chat_id):
         string += f"\n🚘 *Descripción vehículo*: `{escape_markdown(get_car(chat_id),2)}`"
         fee = get_fee(chat_id)
         if fee != None:
-            string += f"\n🪙 *Pago por trayecto*: `{str(fee).replace('.',',')}€`"
+            string += f"\n💰 *Precio por trayecto*: `{str(fee).replace('.',',')}€`"
         bizum = get_bizum(chat_id)
         if bizum == True:
-            string += f"\n💸 `Aceptas Bizum`"
+            string += f"\n💳 `Aceptas Bizum`"
         elif bizum == False:
-            string += f"\n💸🚫 `NO aceptas Bizum`"
+            string += f"\n💳🚫 `NO aceptas Bizum`"
 
     return string
 
 def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
-                        slots=None, car=None, fee=None, passenger_ids=None):
+                          slots=None, car=None, fee=None, bizum=None,
+                          passenger_ids=None, is_abbreviated=False):
     """Generates formatted string with the given trip data.
     All the parameters are optional.
     This function formats the data as it is passed.
@@ -60,8 +68,13 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         Description of the driver's car.
     fee : float
         The per-user payment quantity.
+    bizum : boolean
+        Driver's Bizum preference flag.
     passenger_ids : list of ints
         Telegram Chat IDs of the accepted passengers in the trip.
+    is_abbreviated : boolean
+        Flag to indicate whether to abbreviate the message, only using
+        the emojis and writting all in one line, without Markdown.
 
     Returns
     -------
@@ -69,37 +82,50 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         Formatted string in Telegram's Markdown v2.
 
     """
-    string = ""
+    fields = []
 
-    if chat_id:
-        driver = escape_markdown(get_name(chat_id),2)
-        string += f"🧑 *Conductor*: [{driver}](tg://user?id={str(chat_id)})\n"
-    if direction:
-        string += f"📍 *Dirección*: `{direction[2:]}`\n"
-    if date:
-        string += f"📅 *Fecha*: `{date[8:10]}/{date[5:7]}`\n"
-    if time:
-        string += f"🕖 *Hora*: `{time}`\n"
-    if slots:
-        string += f"💺 *Asientos disponibles*: `{str(slots)}`\n"
-    if car:
-        string += f"🚘 *Descripción vehículo*: `{escape_markdown(get_car(chat_id),2)}`\n"
-    if fee:
-        string += f"🪙 *Precio*: `{str(fee).replace('.',',')}€`\n"
-    if passenger_ids:
-        # passenger_strings = [f"[{escape_markdown(get_name(id),2)}](tg://user?id={str(id)})"
-        #                                             for id in passenger_ids]
-        passenger_strings = []
-        for id in passenger_ids:
-            name = get_name(id)
-            if not name:
-                name = str(id)
-            passenger_strings.append(f"[{escape_markdown(name,2)}](tg://user?id={id})")
-        string += f"👥 *Pasajeros aceptados*: {', '.join(passenger_strings)}\n"
-
-    if string:
-        # Remove last line break
-        string = string[:-1]
+    if not is_abbreviated:
+        if chat_id:
+            fields.append(f"🧑 *Conductor*: {get_markdown2_inline_mention(chat_id)}")
+        if direction:
+            fields.append(f"📍 *Dirección*: `{direction[2:]}`")
+        if date:
+            fields.append(f"📅 *Fecha*: `{date[8:10]}/{date[5:7]}`")
+        if time:
+            fields.append(f"🕖 *Hora*: `{time}`")
+        if slots:
+            fields.append(f"💺 *Asientos disponibles*: `{str(slots)}`")
+        if car:
+            fields.append(f"🚘 *Descripción vehículo*: `{escape_markdown(get_car(chat_id),2)}`")
+        if fee:
+            fields.append(f"💰 *Precio*: `{str(fee).replace('.',',')}€`")
+        if bizum != None:
+            fields.append(f"💳 *Bizum*: `{'Aceptado' if bizum else 'NO aceptado'}`")
+        if passenger_ids:
+            passenger_strings = [get_markdown2_inline_mention(id) for id in passenger_ids]
+            fields.append(f"👥 *Pasajeros aceptados*: {', '.join(passenger_strings)}")
+        string = '\n'.join(fields)
+    else:
+        if chat_id:
+            fields.append(f"🧑 {get_name(chat_id)}")
+        if direction:
+            fields.append(f"📍 {direction[2:]}")
+        if date:
+            fields.append(f"📅 {date[8:10]}/{date[5:7]}")
+        if time:
+            fields.append(f"🕖 {time}")
+        if slots:
+            fields.append(f"💺 {str(slots)}")
+        if car:
+            fields.append(f"🚘 {get_car(chat_id)}")
+        if fee:
+            fields.append(f"💰 {str(fee).replace('.',',')}€")
+        if bizum != None:
+            fields.append(f"💳 {'OK' if bizum else 'NO'}")
+        if passenger_ids:
+            passenger_strings = [get_name(id) for id in passenger_ids]
+            fields.append(f"👥 {', '.join(passenger_strings)}")
+        string = '  '.join(fields)
 
     return string
 
@@ -135,7 +161,7 @@ def get_formatted_trip_for_driver(direction, date, key):
     return format_trip_from_data(direction, date, None, time, slots,
                                 fee=fee, passenger_ids=passengers_list)
 
-def get_formatted_trip_for_passenger(direction, date, key):
+def get_formatted_trip_for_passenger(direction, date, key, is_abbreviated=True):
     """Generates a formatted string with the trip information interesting
     for the passenger.
 
@@ -147,6 +173,10 @@ def get_formatted_trip_for_passenger(direction, date, key):
         Departure date with ISO format 'YYYY-mm-dd'
     key : type
         Unique key of the trip in the DB.
+    is_abbreviated : boolean
+        Flag indicating whether the string must be abbreviated or not.
+        The abbreviated form does not include the car description nor the
+        Bizum preference.
 
     Returns
     -------
@@ -161,11 +191,13 @@ def get_formatted_trip_for_passenger(direction, date, key):
     driver_id = trip_dict['Chat ID']
     slots = trip_dict['Slots'] if 'Slots' in trip_dict else get_slots(driver_id)
     fee = trip_dict['Fee'] if 'Fee' in trip_dict else get_fee(driver_id)
-    car = get_car(driver_id)
+    car = get_car(driver_id) if not is_abbreviated else None
+    bizum = get_bizum(driver_id) if not is_abbreviated else None
     if 'Passengers' in trip_dict:
         slots -= len(trip_dict['Passengers'])
 
-    return format_trip_from_data(direction, date, driver_id, time, slots, car, fee)
+    return format_trip_from_data(direction, date, driver_id, time,
+                                slots, car, fee, bizum)
 
 def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None):
     """Generates a formatted string with the offered trips in the
@@ -178,9 +210,9 @@ def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None
     date : string
         Departure date with ISO format 'YYYY-mm-dd'.
     time_start : string
-        Range's start time with ISO format 'HH:MM'.
+        Range's start time with ISO format 'HH:MM'. Optional
     time_stop : string
-        Range's stop time with ISO format 'HH:MM'.
+        Range's stop time with ISO format 'HH:MM'. Optional
 
     Returns
     -------
@@ -188,10 +220,8 @@ def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None
         Formatted string in Telegram's Markdown v2, and a list of the trips'
         unique key IDs.
 
-
     """
     trips_dict = get_trips_by_date_range(direction, date, time_start, time_stop)
-    trips_strings = []
     index = 1
 
     string = ""
@@ -221,12 +251,50 @@ def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None
                 string += "\n\n"
                 index += 1
                 key_list.append(key)
-
-        # separator = f"\n--------------------------------"\
-        #             f"--------------------------------\n"
-        # string = escape_markdown(separator,2).join(trips_strings)
-
     else:
-        string = "No existen viajes ofertados en las fechas seleccionadas\. 😔"
+        string = "No existen viajes ofertados en las fechas seleccionadas\."
 
     return string, key_list
+
+def get_driver_week_formatted_trips(chat_id):
+    """Generates a formatted string with the offered trips for the next
+    week ahead from a given driver.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the driver.
+
+    Returns
+    -------
+    (string, dict)
+        Formatted string in Telegram's Markdown v2, and the dictionary with
+        the week ahead trips ordered by date.
+
+    """
+    week_strings = week_isoformats()
+    weekday_strings = weekdays_from_today()
+    trips_dict = get_trips_by_driver(chat_id, week_strings[0], week_strings[-1], True)
+
+    string = ""
+    if trips_dict:
+        for date in trips_dict:
+            # Format string with trips
+            header = f"*{weekday_strings[week_strings.index(date)]} "\
+                     f"{date[8:10]}/{date[5:7]}*"
+            sep_length = int(13-len(header)/2)
+            string += f"{'—'*5} {header} {'—'*sep_length}\n"
+            for key in trips_dict[date]:
+                trip = trips_dict[date][key]
+                direction = trip['Direction']
+                time = trip['Time']
+                slots = trip['Slots'] if 'Slots' in trip else None
+                fee = trip['Fee'] if 'Fee' in trip else None
+                passengers_list = trip['Passengers'] if 'Passengers' in trip else None
+                string += format_trip_from_data(direction, time=time, slots=slots,
+                                    fee=fee, passenger_ids=passengers_list)
+                string += "\n\n"
+    else:
+        string = "No tienes viajes ofertados para la próxima semana\."
+
+    return string, trips_dict

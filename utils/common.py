@@ -102,6 +102,30 @@ def today_isoformat():
     """
     return dates_from_today(1)[0].isoformat()
 
+def current_time_isoformat(minutes_divisor=None):
+    """Returns the string representation of the current time.
+
+    Parameters
+    ----------
+    minutes_divisor : int
+        The required divisor of the minutes to return.
+        For example, if minutes_divisor=15, then the returned minutes
+        could only be (0, 15, 30, 45).
+
+    Returns
+    -------
+    string
+        ISO format of current time as HH:MM.
+
+    """
+    madrid = timezone('Europe/Madrid')
+    time1 = datetime.now(madrid).time()
+    if minutes_divisor:
+        minutes = time1.minute
+        time1 = time1.replace(minute=(minutes-minutes%minutes_divisor))
+    text = time1.isoformat('minutes')
+    return text
+
 def week_isoformats():
     """Obtains a list of the ISO-formatted strings of a whole week from today.
 

@@ -1,7 +1,8 @@
 from os import environ
 import logging
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from commands import actions, actions_config, actions_trip, actions_booking
+from commands import (actions, actions_config, actions_trip, actions_booking,
+                      actions_mytrips)
 import firebase_admin
 from firebase_admin import db
 import json
@@ -66,6 +67,9 @@ def main(webhook_flag = True):
 
     # Add booking actions
     actions_booking.add_handlers(dp)
+
+    # Add my trips actions
+    actions_mytrips.add_handlers(dp)
 
     # on different commands - answer in Telegram
     dp.add_handler(CommandHandler("record", record))

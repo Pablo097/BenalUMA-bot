@@ -21,10 +21,12 @@ def time_picker_keyboard(hour=None, minutes=None, ikbs_list=None):
     InlineKeyboardMarkup
 
     """
-    if hour==None:
-        hour = 12
-    if minutes==None:
-        minutes = 0
+    if hour==None or minutes==None:
+        current_time = current_time_isoformat(15)
+        if hour==None:
+            hour = int(current_time[:2])
+        if minutes==None:
+            minutes = int(current_time[-2:])
 
     cbd = "TIME_PICKER"
     hs = f"{hour:0>2}"

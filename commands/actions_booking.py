@@ -3,13 +3,14 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
-from data.database_api import (get_slots, get_trip, get_trip_chat_id,
+from data.database_api import (get_name, get_slots, get_trip, get_trip_chat_id,
                                 get_number_of_passengers, get_trip_slots,
-                                add_passenger, is_passenger)
+                                add_passenger, is_passenger, get_trip_time)
 from utils.keyboards import (weekdays_keyboard, trip_ids_keyboard)
 from utils.time_picker import (time_picker_keyboard, process_time_callback)
 from utils.common import *
-from utils.format import (get_formatted_trip_for_passenger,
+from utils.format import (get_markdown2_inline_mention,
+                          get_formatted_trip_for_passenger,
                           get_formatted_trip_for_driver,
                           get_formatted_offered_trips)
 from utils.decorators import registered
@@ -195,7 +196,9 @@ def SO_reserve(update, context):
         return ConversationHandler.END
 
     # Send petition to driver
-    text_driver = escape_markdown(f"🛎️ Tienes una nueva petición de reserva:\n\n",2)
+    text_driver = f"🛎️ Tienes una nueva petición de reserva de "\
+                  f"{get_markdown2_inline_mention(user_id)} para el siguiente viaje:\n\n"
+    text_driver = escape_markdown(text_driver, 2)
     text_driver += get_formatted_trip_for_driver(dir, date, trip_key)
 
     cbd = 'ALERT'
@@ -208,14 +211,22 @@ def SO_reserve(update, context):
                                 reply_markup=InlineKeyboardMarkup(driver_keyboard),
                                 parse_mode=telegram.ParseMode.MARKDOWN_V2)
         text = f"¡Hecho! Se ha enviado una petición de reserva para este viaje. 📝\n\n"
+        text = escape_markdown(text, 2)
+        text += get_formatted_trip_for_passenger(dir, date, trip_key)
+        text_aux = f"\n\nAhora tienes que esperar a que el conductor decida si"\
+                   f" confirmar o rechazar tu solicitud. Te volveré a avisar"\
+                   f" en cualquier caso, no te preocupes.\nRecuerda que siempre"\
+                   f" puedes contactar con el conductor pulsando sobre su nombre"\
+                   f" si lo necesitas."
+        text += escape_markdown(text_aux, 2)
     except:
-        logger.warning("Booking reservation alert couldn't be sent to driver.")
+        logger.warning(f"Booking reservation alert couldn't be sent to driver with chat_id:{driver_id}.")
         text = f"🚫 No se ha podido enviar la petición de reserva al conductor,"\
                f" quizás porque haya bloqueado al bot. 🚫\nPor favor, mándale un"\
                f" mensaje privado pulsando en su nombre si sigues interesado.\n\n"
+        text = escape_markdown(text, 2)
+        text += get_formatted_trip_for_passenger(dir, date, trip_key)
 
-    text = escape_markdown(text, 2)
-    text += get_formatted_trip_for_passenger(dir, date, trip_key)
     query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return ConversationHandler.END
 
@@ -265,7 +276,13 @@ def alert_user(update, context):
     elif dir == 'UMA':
         dir = 'toUMA'
 
-    if action == "Y":
+    reservation_ok = False
+    # Check that trip still exists
+    if get_trip_time(dir, date, trip_key) == None:
+        text = escape_markdown(f"⚠️ Este viaje ya no existe.",2)
+        text_booker = ""
+    # Check action
+    elif action == "Y":
         if is_passenger(user_id, dir, date, trip_key):
             text = f"⚠️ No puedes aceptar a este usuario porque ya es un"\
                    f" pasajero confirmado para este viaje."
@@ -283,6 +300,7 @@ def alert_user(update, context):
                 text += get_formatted_trip_for_driver(dir, date, trip_key)
                 text_booker = f"¡Enhorabuena! Te han confirmado la reserva para "\
                               f"el siguiente viaje.\n\n"
+                reservation_ok = True
             else:
                 text = f"⚠️ Atención, no te quedan plazas para este viaje. No es "\
                        f"posible confirmar esta reserva."
@@ -291,21 +309,25 @@ def alert_user(update, context):
                               f"porque no quedan más plazas libres. Contacta con el "\
                               f"conductor pulsando sobre su nombre si quieres "\
                               f"preguntarle sobre la disponibilidad.\n\n"
-
     elif action == "N":
         text = escape_markdown("🚫 Has rechazado la petición de reserva.",2)
         text_booker = f"❌ Tu petición de reserva para el siguiente viaje ha"\
                       f" sido rechazada.\n\n"
 
-
     # Send messages
     query.edit_message_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
     if text_booker:
         text_booker = escape_markdown(text_booker,2)
-        text_booker += get_formatted_trip_for_passenger(dir, date, trip_key)
-        context.bot.send_message(user_id, text_booker,
+        text_booker += get_formatted_trip_for_passenger(dir, date, trip_key,
+                                        is_abbreviated = not reservation_ok)
+        try:
+            context.bot.send_message(user_id, text_booker,
                                     parse_mode=telegram.ParseMode.MARKDOWN_V2)
-
+        except:
+            logger.warning(f"Booking alert text could not be sent back to user with chat_id:{user_id}.")
+            text = f"🚫 No se ha podido enviar el mensaje de respuesta al usuario."\
+                   f" 🚫\nPor favor, si lo ves necesario, contáctale por privado."
+            context.bot.send_message(driver_id, text)
 
 def add_handlers(dispatcher):
     regex_iso_date = '^([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])$'
