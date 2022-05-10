@@ -6,15 +6,15 @@ from telegram.utils.helpers import escape_markdown
 from data.database_api import (get_name, get_slots, get_trip, get_trip_chat_id,
                                 get_number_of_passengers, get_trip_slots,
                                 add_passenger, is_passenger, get_trip_time)
-from utils.keyboards import (weekdays_keyboard, trip_ids_keyboard)
-from utils.time_picker import (time_picker_keyboard, process_time_callback)
-from utils.common import *
-from utils.format import (get_markdown2_inline_mention,
+from messages.format import (get_markdown2_inline_mention,
                           get_formatted_trip_for_passenger,
                           get_formatted_trip_for_driver,
                           get_formatted_offered_trips)
+from messages.message_queue import send_message
+from utils.keyboards import (weekdays_keyboard, trip_ids_keyboard)
+from utils.time_picker import (time_picker_keyboard, process_time_callback)
+from utils.common import *
 from utils.decorators import registered
-
 
 # 'See Offers' conversation points
 (SO_START, SO_DATE, SO_HOUR, SO_HOUR_SELECT_RANGE_START,
@@ -320,14 +320,16 @@ def alert_user(update, context):
         text_booker = escape_markdown(text_booker,2)
         text_booker += get_formatted_trip_for_passenger(dir, date, trip_key,
                                         is_abbreviated = not reservation_ok)
-        try:
-            context.bot.send_message(user_id, text_booker,
-                                    parse_mode=telegram.ParseMode.MARKDOWN_V2)
-        except:
-            logger.warning(f"Booking alert text could not be sent back to user with chat_id:{user_id}.")
-            text = f"🚫 No se ha podido enviar el mensaje de respuesta al usuario."\
-                   f" 🚫\nPor favor, si lo ves necesario, contáctale por privado."
-            context.bot.send_message(driver_id, text)
+        send_message(context, user_id, text_booker, telegram.ParseMode.MARKDOWN_V2,
+                            notify_id = driver_id)
+        # try:
+        #     context.bot.send_message(user_id, text_booker,
+        #                             parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        # except:
+        #     logger.warning(f"Booking alert text could not be sent back to user with chat_id:{user_id}.")
+        #     text = f"🚫 No se ha podido enviar el mensaje de respuesta al usuario."\
+        #            f" 🚫\nPor favor, si lo ves necesario, contáctale por privado."
+        #     context.bot.send_message(driver_id, text)
 
 def add_handlers(dispatcher):
     regex_iso_date = '^([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])$'

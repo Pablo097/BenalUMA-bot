@@ -5,12 +5,13 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
 from telegram.utils.helpers import escape_markdown
 from data.database_api import (delete_trip, is_passenger, remove_passenger,
                                 get_trip_passengers)
-from utils.keyboards import my_trips_keyboard, passengers_keyboard
-from utils.common import *
-from utils.format import (get_markdown2_inline_mention,
+from messages.format import (get_markdown2_inline_mention,
                           get_formatted_trip_for_driver,
                           get_formatted_trip_for_passenger,
                           get_driver_week_formatted_trips)
+from messages.message_queue import send_message
+from utils.keyboards import my_trips_keyboard, passengers_keyboard
+from utils.common import *
 from utils.decorators import registered, driver, send_typing_action
 
 (MYTRIPS_SELECT, MYTRIPS_EDIT, MYTRIPS_EDITING,
@@ -243,19 +244,20 @@ def MT_execute_action(update, context):
                              f"aceptado como pasajero, ha sido anulado:\n\n"
             text_passenger = escape_markdown(text_passenger,2)
             text_passenger += get_formatted_trip_for_passenger(direction, date, trip_key)
-            # TODO: I should put this into a message queue shared with other
-            # users' possible messages, when I know how to implement that
-            for passenger_id in passenger_ids:
-                try:
-                    context.bot.send_message(passenger_id, text_passenger,
-                                    parse_mode=telegram.ParseMode.MARKDOWN_V2)
-                except:
-                    logger.warning(f"Trip cancelation message couldn't be sent to passenger with chat_id:{passenger_id}.")
-                    text_aux = f"🚫 Atención: No se ha podido avisar a "\
-                           f"{get_markdown2_inline_mention(passenger_id)}\. 🚫\n"\
-                           f"Por favor, si lo ves necesario, contáctale por privado\."
-                    context.bot.send_message(update.effective_chat.id, text_aux,
-                                    parse_mode=telegram.ParseMode.MARKDOWN_V2)
+            send_message(context, passenger_ids, text_passenger,
+                                telegram.ParseMode.MARKDOWN_V2,
+                                notify_id=update.effective_chat.id)
+            # for passenger_id in passenger_ids:
+            #     try:
+            #         context.bot.send_message(passenger_id, text_passenger,
+            #                         parse_mode=telegram.ParseMode.MARKDOWN_V2)
+            #     except:
+            #         logger.warning(f"Trip cancelation message couldn't be sent to passenger with chat_id:{passenger_id}.")
+            #         text_aux = f"🚫 Atención: No se ha podido avisar a "\
+            #                f"{get_markdown2_inline_mention(passenger_id)}\. 🚫\n"\
+            #                f"Por favor, si lo ves necesario, contáctale por privado\."
+            #         context.bot.send_message(update.effective_chat.id, text_aux,
+            #                         parse_mode=telegram.ParseMode.MARKDOWN_V2)
         delete_trip(direction, date, trip_key)
         text = escape_markdown(f"Tu viaje ha sido anulado correctamente.",2)
     else:
@@ -266,14 +268,17 @@ def MT_execute_action(update, context):
             # Notify user
             text_passenger = f"🚫 Has sido expulsado del siguiente viaje:\n\n"
             text_passenger += get_formatted_trip_for_passenger(direction, date, trip_key)
-            try:
-                context.bot.send_message(passenger_id, text_passenger,
-                                parse_mode=telegram.ParseMode.MARKDOWN_V2)
-            except:
-                logger.warning(f"Trip rejection message couldn't be sent to passenger with chat_id:{passenger_id}.")
-                text_aux = f"🚫 Atención: No se ha podido avisar al pasajero. 🚫\n"\
-                       f"Por favor, si lo ves necesario, contáctale por privado."
-                context.bot.send_message(update.effective_chat.id, text_aux)
+            send_message(context, passenger_id, text_passenger,
+                                telegram.ParseMode.MARKDOWN_V2,
+                                notify_id=update.effective_chat.id)
+            # try:
+            #     context.bot.send_message(passenger_id, text_passenger,
+            #                     parse_mode=telegram.ParseMode.MARKDOWN_V2)
+            # except:
+            #     logger.warning(f"Trip rejection message couldn't be sent to passenger with chat_id:{passenger_id}.")
+            #     text_aux = f"🚫 Atención: No se ha podido avisar al pasajero. 🚫\n"\
+            #            f"Por favor, si lo ves necesario, contáctale por privado."
+            #     context.bot.send_message(update.effective_chat.id, text_aux)
             # Text for driver
             text = f"Has expulsado a {get_markdown2_inline_mention(passenger_id)}"\
                    f" del siguiente viaje:\n\n"

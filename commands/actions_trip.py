@@ -4,10 +4,10 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
 from data.database_api import add_trip
+from messages.format import get_formatted_trip_for_driver
 from utils.keyboards import weekdays_keyboard
 from utils.time_picker import (time_picker_keyboard, process_time_callback)
 from utils.common import *
-from utils.format import get_formatted_trip_for_driver
 from utils.decorators import registered, driver
 
 # 'New trip' conversation points

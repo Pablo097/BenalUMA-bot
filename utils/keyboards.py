@@ -1,7 +1,7 @@
 import logging, math
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from data.database_api import is_driver, get_name
-from utils.format import format_trip_from_data
+from messages.format import format_trip_from_data
 from utils.common import weekdays_from_today, week_isoformats, ccd, scd
 
 def config_keyboard(chat_id):

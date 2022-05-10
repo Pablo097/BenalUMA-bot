@@ -6,9 +6,9 @@ from telegram.utils.helpers import escape_markdown
 from data.database_api import (is_registered, is_driver, set_name, set_car,
                                 set_slots, set_bizum, set_fee, add_driver,
                                 delete_driver, delete_user)
+from messages.format import get_formatted_user_config
 from utils.keyboards import config_keyboard
 from utils.common import *
-from utils.format import get_formatted_user_config
 from utils.decorators import registered
 
 (CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE,

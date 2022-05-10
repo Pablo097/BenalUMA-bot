@@ -7,6 +7,7 @@ MAX_FEE = 1.5
 
 emoji_numbers = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+madrid = timezone('Europe/Madrid')
 
 ## Parsing
 
@@ -83,7 +84,6 @@ def dates_from_today(number_of_days):
         Date objects with the days from today.
 
     """
-    madrid = timezone('Europe/Madrid')
     today = datetime.now(madrid).date()
     delta = timedelta(days=1)
     dates = []
@@ -118,7 +118,6 @@ def current_time_isoformat(minutes_divisor=None):
         ISO format of current time as HH:MM.
 
     """
-    madrid = timezone('Europe/Madrid')
     time1 = datetime.now(madrid).time()
     if minutes_divisor:
         minutes = time1.minute
@@ -165,7 +164,6 @@ def is_future_datetime(date, time):
         True if input datetime is future, false if it is past from now.
 
     """
-    madrid = timezone('Europe/Madrid')
     now = datetime.now(madrid).replace(tzinfo=None)
     input_datetime = datetime.fromisoformat(f"{date}T{time}")
     return input_datetime > now
