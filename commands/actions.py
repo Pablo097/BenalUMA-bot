@@ -1,13 +1,14 @@
 import logging, telegram
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
-from data.database_api import add_user, add_driver, is_registered, is_driver
+from data.database_api import add_user, add_driver, is_registered, is_driver, set_fee
+from utils.common import *
 
 REG_NAME, REG_USAGE, REG_SLOTS, REG_CAR = range(4)
 
 def start(update, context):
     if update.message.chat.type == "private":
-        text = f"¡Bienvenido al bot de BenalUMA! 🚗🚗"\
+        text = f"🚗 ¡Bienvenido al bot de BenalUMA! 🚗"\
                f"\n\nPara comenzar, escribe /registro para registrarte en el sistema"\
                f" o /help para ver los comandos disponibles."
         update.message.reply_text(text)
@@ -102,9 +103,13 @@ def register_car(update, context):
     car = update.message.text
     context.user_data.clear()
     add_driver(update.effective_chat.id, slots, car)
+    set_fee(update.effective_chat.id, MAX_FEE)
 
-    text = f"Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
+    text = f"Te has registrado correctamente. Se te ha configurado un precio"\
+           f" por trayecto de {str(MAX_FEE).replace('.',',')}€ por defecto."\
+           f" Puedes cambiar esto y más ajustes con el comando /config."
     update.message.reply_text(text)
+    update.message.reply_text("¡Ya puedes empezar a usar el bot!")
 
     return ConversationHandler.END
 

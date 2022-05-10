@@ -4,9 +4,9 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
 from data.database_api import (is_registered, is_driver, set_name, set_car,
-                                set_slots, set_bizum, set_fee, add_driver,
-                                delete_driver, delete_user)
+                                set_slots, set_bizum, set_fee, add_driver)
 from messages.format import get_formatted_user_config
+from messages.notifications import delete_driver_notify, delete_user_notify
 from utils.keyboards import config_keyboard
 from utils.common import *
 from utils.decorators import registered
@@ -256,21 +256,16 @@ def update_user_property_callback(update, context):
         role = context.user_data.pop('role')
         if role=='Conductor':
             add_driver(update.effective_chat.id, 3, "")
+            set_fee(update.effective_chat.id, MAX_FEE)
             text = f"Rol cambiado a conductor correctamente."\
                    f"\nSe te aplicado una configuración por defecto. Por favor,"\
                    f" configura correctamente al menos tu número de asientos y"\
                    f" la descripción de tu coche."
         elif role=='Pasajero':
-            # TODO: Notify first all users who are accepted passengers of their
-            # trips, remove them from the trips and then delete the user along with
-            # all their trips
-            delete_driver(update.effective_chat.id)
+            delete_driver_notify(update, context, update.effective_chat.id)
             text = f"Rol cambiado a pasajero correctamente."
     elif option == 'delete':
-        # TODO: Notify first all users who are accepted passengers of their
-        # trips, remove them from the trips and then delete the user along with
-        # all their trips
-        delete_user(update.effective_chat.id)
+        delete_user_notify(update, context, update.effective_chat.id)
         text = f"Tu cuenta se ha eliminado correctamente. \n¡Que te vaya bien! 🖖"
         query.edit_message_text(text)
         return ConversationHandler.END

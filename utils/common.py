@@ -148,7 +148,7 @@ def weekdays_from_today():
     """
     return [weekdays[date.weekday()] for date in dates_from_today(7)]
 
-def is_future_datetime(date, time):
+def is_future_datetime(date, time, minutes_margin=0):
     """Checks whether the input datetime is in the future from now.
 
     Parameters
@@ -157,6 +157,9 @@ def is_future_datetime(date, time):
         Date with ISO format 'YYYY-mm-dd'
     time : string
         Time with ISO format 'HH:MM'
+    minutes_margin : int
+        This number of minutes will be added to the inputted datetime before
+        comparing it to now.
 
     Returns
     -------
@@ -166,7 +169,7 @@ def is_future_datetime(date, time):
     """
     now = datetime.now(madrid).replace(tzinfo=None)
     input_datetime = datetime.fromisoformat(f"{date}T{time}")
-    return input_datetime > now
+    return input_datetime+timedelta(minutes=minutes_margin) > now
 
 def is_greater_isotime(time1, time2):
     return time.fromisoformat(time1) > time.fromisoformat(time2)

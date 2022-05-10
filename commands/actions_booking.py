@@ -183,6 +183,7 @@ def SO_reserve(update, context):
     trip_key = ';'.join(data[1:])   # Just in case the unique ID constains a ';'
     user_id = update.effective_chat.id
     driver_id = get_trip_chat_id(dir, date, trip_key)
+    time = get_trip_time(dir, date, trip_key)
 
     # Check that user is not the driver
     if user_id == driver_id:
@@ -193,6 +194,15 @@ def SO_reserve(update, context):
     if is_passenger(user_id, dir, date, trip_key):
         text = f"🚫 No puedes volver a reservar este viaje. Ya eres un pasajero confirmado."
         query.edit_message_text(text=text)
+        return ConversationHandler.END
+    # Check if trip hasn't ocurred yet
+    if not is_future_datetime(date, time):
+        text = f"🚫 No puedes reservar este viaje porque la hora de salida ya"\
+               f" ha pasado. Puedes preguntarle personalmente al conductor por"\
+               f" mensaje privado pulsando sobre su nombre.\n\n"
+        text = escape_markdown(text, 2)
+        text += get_formatted_trip_for_passenger(dir, date, trip_key)
+        query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return ConversationHandler.END
 
     # Send petition to driver
@@ -322,14 +332,6 @@ def alert_user(update, context):
                                         is_abbreviated = not reservation_ok)
         send_message(context, user_id, text_booker, telegram.ParseMode.MARKDOWN_V2,
                             notify_id = driver_id)
-        # try:
-        #     context.bot.send_message(user_id, text_booker,
-        #                             parse_mode=telegram.ParseMode.MARKDOWN_V2)
-        # except:
-        #     logger.warning(f"Booking alert text could not be sent back to user with chat_id:{user_id}.")
-        #     text = f"🚫 No se ha podido enviar el mensaje de respuesta al usuario."\
-        #            f" 🚫\nPor favor, si lo ves necesario, contáctale por privado."
-        #     context.bot.send_message(driver_id, text)
 
 def add_handlers(dispatcher):
     regex_iso_date = '^([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])$'

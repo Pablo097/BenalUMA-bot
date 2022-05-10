@@ -25,10 +25,10 @@ def callback_send_message(context):
             logger.warning(text2)
             # Notify is necessary about not delivered messages
             if 'notify_id' in message_dict:
-                text = f"🚫 No se ha podido enviar el mensaje a "\
+                text3 = f"🚫 No se ha podido enviar el mensaje a "\
                        f"{get_markdown2_inline_mention(id)}\. 🚫\n"\
                        f"Por favor, si lo ves necesario, contáctale por privado\."
-                send_message(context, message_dict['notify_id'], text,
+                send_message(context, message_dict['notify_id'], text3,
                                             telegram.ParseMode.MARKDOWN_V2)
 
 def send_message(context, chat_id, text, parse_mode=None,

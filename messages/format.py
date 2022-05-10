@@ -283,7 +283,7 @@ def get_driver_week_formatted_trips(chat_id):
             header = f"*{weekday_strings[week_strings.index(date)]} "\
                      f"{date[8:10]}/{date[5:7]}*"
             sep_length = int(13-len(header)/2)
-            string += f"{'—'*5} {header} {'—'*sep_length}\n"
+            string += f"{'—'*5} {header} {'—'*sep_length}\n\n"
             for key in trips_dict[date]:
                 trip = trips_dict[date][key]
                 direction = trip['Direction']

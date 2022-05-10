@@ -153,8 +153,8 @@ def delete_driver(chat_id):
 
     """
 
-    db.reference(f"/Drivers/{str(chat_id)}").delete()
     delete_all_trips_by_driver(chat_id)
+    db.reference(f"/Drivers/{str(chat_id)}").delete()
     # Note: All passengers from deteled trips should be noticed about the deletion
     # Maybe do that outside the DB functions, as DB does not need to know about that
 
@@ -319,8 +319,7 @@ def set_bizum(chat_id, bizum_pref):
 
 # Trips
 
-def add_trip(direction, chat_id, date, time, time_window = 0,
-             slots = None, fee = None):
+def add_trip(direction, chat_id, date, time, slots = None, fee = None):
     """Creates new trip with given information.
 
     Parameters
@@ -333,9 +332,6 @@ def add_trip(direction, chat_id, date, time, time_window = 0,
         Departure date with ISO format 'YYYY-mm-dd'
     time : string
         Departure time with ISO format 'HH:MM'
-    time_window : int
-        Determines how flexible is the departure time as the number of
-        minutes from it.
     slots : int
         Optional. Number of available slots for this specific trip.
     fee : float
@@ -354,9 +350,6 @@ def add_trip(direction, chat_id, date, time, time_window = 0,
     # time_string = departure_date.strftime('%H:%M')
     trip_dict = {'Chat ID': chat_id,
                  'Time': time}
-
-    if time_window>0:
-        trip_dict['Time Window'] = time_window
 
     if slots != None:
         trip_dict['Slots'] = slots
@@ -392,6 +385,10 @@ def delete_trip(direction, date, key):
     chat_id = get_trip_chat_id(direction, date, key)
     db.reference(f"/Trips/{direction}/{date}/{key}").delete()
     db.reference(f"/Drivers/{chat_id}/Offers/{direction}/{date}/{key}").delete()
+
+    # Remove passengers if any
+    for passenger_id in get_trip_passengers(direction, date, key):
+        remove_passenger(passenger_id, direction, date, key)
 
 def get_trip(direction, date, key):
     """Gets a dictionary with the given trip info.
@@ -771,15 +768,14 @@ def remove_passenger(chat_id, direction, date, key):
         False if the user was not a passenger in this trip.
 
     """
-    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Passengers")
-    passengers_dict = ref.get()
-
-    if passengers_dict and str(chat_id) in passengers_dict:
+    ref = db.reference(f"/Passengers/{chat_id}/{direction}/{date}/{key}")
+    if ref.get():
+        # Delete it from the passenger's own list of reserved trips
+        ref.delete()
+        # Now delete passenger from passenger list in trip info
+        ref = db.reference(f"/Trips/{direction}/{date}/{key}/Passengers")
         ref.child(str(chat_id)).delete()
     else:
         return False
-
-    # Now delete it from the passenger's own list of reserved trips
-    db.reference(f"/Passengers/{chat_id}/{direction}/{date}/{key}").delete()
 
     return True
