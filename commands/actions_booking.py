@@ -208,7 +208,6 @@ def SO_reserve(update, context):
     # Send petition to driver
     text_driver = f"🛎️ Tienes una nueva petición de reserva de "\
                   f"{get_markdown2_inline_mention(user_id)} para el siguiente viaje:\n\n"
-    text_driver = escape_markdown(text_driver, 2)
     text_driver += get_formatted_trip_for_driver(dir, date, trip_key)
 
     cbd = 'ALERT'
