@@ -3,14 +3,13 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
-from data.database_api import (delete_trip, is_passenger, remove_passenger,
+from data.database_api import (delete_trip, remove_passenger,
                                 get_trip_passengers, get_trip_time)
 from messages.format import (get_markdown2_inline_mention,
                           get_formatted_trip_for_driver,
-                          get_formatted_trip_for_passenger,
                           get_driver_week_formatted_trips)
 from messages.notifications import delete_trip_notify, remove_passenger_notify
-from utils.keyboards import my_trips_keyboard, passengers_keyboard
+from utils.keyboards import trips_keyboard, passengers_keyboard
 from utils.common import *
 from utils.decorators import registered, driver, send_typing_action
 
@@ -22,8 +21,6 @@ ikbs_end_MT = [[InlineKeyboardButton("Terminar", callback_data="MT_END")]]
 ikbs_back_MT = [[InlineKeyboardButton("↩️ Volver", callback_data="MT_BACK")]]
 
 logger = logging.getLogger(__name__)
-
-# TODO ESTA COPIADO, REHACER
 
 @send_typing_action
 @driver
@@ -39,10 +36,10 @@ def my_trips(update, context):
         if key.startswith('MT_'):
             del context.user_data[key]
 
-    text = f"Viajes ofertados para los próximos 7 días:\n\n"
     formatted_trips, trips_dict = get_driver_week_formatted_trips(update.effective_chat.id)
-    text += f"{formatted_trips} \n"
     if trips_dict:
+        text = f"Viajes ofertados para los próximos 7 días:\n\n"
+        text += f"{formatted_trips} \n"
         context.user_data['MT_dict'] = trips_dict
         keyboard = [[InlineKeyboardButton("Anular viaje", callback_data="MT_CANCEL")],
                     [InlineKeyboardButton("Expulsar pasajero", callback_data="MT_REJECT")]]
@@ -53,7 +50,8 @@ def my_trips(update, context):
                 reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return MYTRIPS_SELECT
     else:
-        update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        text = "No tienes viajes ofertados para la próxima semana."
+        update.message.reply_text(text)
     return ConversationHandler.END
 
 @send_typing_action
@@ -67,10 +65,10 @@ def my_trips_restart(update, context):
         if key.startswith('MT_'):
             del context.user_data[key]
 
-    text = f"Viajes ofertados para los próximos 7 días:\n\n"
     formatted_trips, trips_dict = get_driver_week_formatted_trips(update.effective_chat.id)
-    text += f"{formatted_trips} \n"
     if trips_dict:
+        text = f"Viajes ofertados para los próximos 7 días:\n\n"
+        text += f"{formatted_trips} \n"
         context.user_data['MT_dict'] = trips_dict
         keyboard = [[InlineKeyboardButton("Anular viaje", callback_data="MT_CANCEL")],
                     [InlineKeyboardButton("Expulsar pasajero", callback_data="MT_REJECT")]]
@@ -80,7 +78,8 @@ def my_trips_restart(update, context):
                             parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return MYTRIPS_SELECT
     else:
-        query.edit_message_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        text = "No tienes viajes ofertados para la próxima semana."
+        query.edit_message_text(text)
     return ConversationHandler.END
 
 def choose_trip(update, context):
@@ -92,12 +91,12 @@ def choose_trip(update, context):
     # if query.data == "MT_EDIT":
     #     next_state = MYTRIPS_EDIT
     #     text = f"¿Qué viaje quieres editar?"
-    #     reply_markup = my_trips_keyboard(trips_dict, ikbs_back_MT,
+    #     reply_markup = trips_keyboard(trips_dict, 'MT', ikbs_back_MT,
     #                                             show_passengers=False)
     if query.data == "MT_CANCEL":
         next_state = MYTRIPS_CANCEL
         text = f"¿Qué viaje quieres anular?"
-        reply_markup = my_trips_keyboard(trips_dict, ikbs_back_MT,
+        reply_markup = trips_keyboard(trips_dict, 'MT', ikbs_back_MT,
                                 show_extra_param=False, show_passengers=False)
     elif query.data == "MT_REJECT":
         next_state = MYTRIPS_REJECT
@@ -112,7 +111,7 @@ def choose_trip(update, context):
                 trips_dict_with_passengers[date] = date_dict
         # Message dependent on whether there are passengers or not
         if trips_dict_with_passengers:
-            reply_markup = my_trips_keyboard(trips_dict_with_passengers,
+            reply_markup = trips_keyboard(trips_dict_with_passengers, 'MT',
                                         ikbs_back_MT, show_extra_param=False)
             text = f"Elige el viaje del que quieras expulsar a un pasajero:"
         else:

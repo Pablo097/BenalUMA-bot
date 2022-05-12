@@ -1,8 +1,10 @@
 import logging
 import re
+from datetime import datetime
 from data.database_api import (get_name, is_driver, get_slots, get_car,
                                get_fee, get_bizum, get_trip,
-                               get_trips_by_date_range, get_trips_by_driver)
+                               get_trips_by_date_range, get_trips_by_driver,
+                               get_trips_by_passenger)
 from telegram.utils.helpers import escape_markdown
 from utils.common import *
 
@@ -90,7 +92,8 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         if direction:
             fields.append(f"📍 *Dirección*: `{direction[2:]}`")
         if date:
-            fields.append(f"📅 *Fecha*: `{date[8:10]}/{date[5:7]}`")
+            weekday = weekdays[datetime.fromisoformat(date).weekday()]
+            fields.append(f"📅 *Fecha*: `{weekday} {date[8:10]}/{date[5:7]}`")
         if time:
             fields.append(f"🕖 *Hora*: `{time}`")
         if slots:
@@ -111,7 +114,8 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         if direction:
             fields.append(f"📍 {direction[2:]}")
         if date:
-            fields.append(f"📅 {date[8:10]}/{date[5:7]}")
+            weekday = weekdays[datetime.fromisoformat(date).weekday()]
+            fields.append(f"📅 {weekday} {date[8:10]}")
         if time:
             fields.append(f"🕖 {time}")
         if slots:
@@ -294,7 +298,54 @@ def get_driver_week_formatted_trips(chat_id):
                 string += format_trip_from_data(direction, time=time, slots=slots,
                                     fee=fee, passenger_ids=passengers_list)
                 string += "\n\n"
-    else:
-        string = "No tienes viajes ofertados para la próxima semana\."
+
+    return string, trips_dict
+
+def get_user_week_formatted_bookings(chat_id):
+    """Generates a formatted string with the booked trips for the next
+    week ahead from a given user.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user.
+
+    Returns
+    -------
+    (string, dict)
+        Formatted string in Telegram's Markdown v2, and the dictionary with
+        the week ahead bookings ordered by date.
+
+    """
+    week_strings = week_isoformats()
+    weekday_strings = weekdays_from_today()
+    trips_dict = get_trips_by_passenger(chat_id, week_strings[0], week_strings[-1], True)
+
+    string = ""
+    if trips_dict:
+        for date in trips_dict:
+            # Format string with trips
+            header = f"*{weekday_strings[week_strings.index(date)]} "\
+                     f"{date[8:10]}/{date[5:7]}*"
+            sep_length = int(13-len(header)/2)
+            string += f"{'—'*5} {header} {'—'*sep_length}\n\n"
+            for key in trips_dict[date]:
+                trip = trips_dict[date][key]
+                driver_id = trip['Chat ID']
+                direction = trip['Direction']
+                time = trip['Time']
+                fee = trip['Fee'] if 'Fee' in trip else get_fee(driver_id)
+                slots = trip['Slots'] if 'Slots' in trip else get_slots(driver_id)
+                if 'Passengers' in trip:
+                    slots -= len(trip['Passengers'])
+                    # Maybe it is also useful for passengers to see the other
+                    # passengers in their booked trips?
+                car = get_car(driver_id)
+                bizum = get_bizum(driver_id)
+
+                string += format_trip_from_data(direction, chat_id=driver_id,
+                                            time=time, slots=slots, car=car,
+                                            fee=fee, bizum=bizum)
+                string += "\n\n"
 
     return string, trips_dict

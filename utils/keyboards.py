@@ -111,10 +111,10 @@ def trip_ids_keyboard(key_list, ikbs_list=None):
         keyboard += ikbs_list
     return InlineKeyboardMarkup(keyboard)
 
-def my_trips_keyboard(trips_dict, ikbs_list=None, show_extra_param=True,
+def trips_keyboard(trips_dict, command, ikbs_list=None, show_extra_param=True,
                                                     show_passengers=True):
     """Creates an inline keyboard with formatted trips data which return
-    callback datas with format "MT_ID;<abbr_dir>;<date>;<key>" for each trip button.
+    callback datas with format "<command>_ID;<abbr_dir>;<date>;<key>" for each trip button.
 
     Parameters
     ----------
@@ -134,7 +134,7 @@ def my_trips_keyboard(trips_dict, ikbs_list=None, show_extra_param=True,
         The keyboard whose callback datas have the explained format.
 
     """
-    cbd = 'MT_ID'
+    cbd = f"{command}_ID"
     keyboard = []
     for date in trips_dict:
         for key in trips_dict[date]:

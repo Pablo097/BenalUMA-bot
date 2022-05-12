@@ -22,12 +22,15 @@ def help(update, context):
 
         if is_registered(update.effective_chat.id):
             text += f"\n⚙️ /config - Accede a las opciones de configuración de tu cuenta."
-            text += f"\n📚 /verofertas - Mostrar viajes ofertados que cumplan los criterios indicados."
+            text += f"\n📚 /verofertas - Muestra viajes ofertados que cumplan los criterios indicados."
             if is_driver(update.effective_chat.id):
-                text += f"\n🏁 /nuevoviaje - Inicia el asistente para crear una nueva"\
+                text += f"\n📘 /nuevoviaje - Inicia el asistente para crear una nueva"\
                         f" oferta de viaje."
                 text += f"\n📆 /misviajes - Muestra los viajes que tienes ofertados"\
                         f" para esta semana."
+            text += f"\n🎟️ /misreservas - Muestra tus viajes reservados esta semana."
+            # text += f"\n📕 /pedirviaje - Inicia el asistente para crear una nueva"\
+            #         f" demanda de viaje."
         else:
             text += f"\n🔑 /registro - Comienza a usar BenalUMA registrándote en el sistema."
 
