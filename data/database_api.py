@@ -2,7 +2,7 @@ import firebase_admin
 from firebase_admin import db
 import json
 from datetime import datetime
-from utils.common import week_isoformats
+from utils.common import week_isoformats, weekdays_en
 from collections import OrderedDict
 
 # General
@@ -777,5 +777,240 @@ def remove_passenger(chat_id, direction, date, key):
         ref.child(str(chat_id)).delete()
     else:
         return False
+
+    return True
+
+
+# Notifications
+
+def get_offer_notification_by_user(chat_id, direction=None):
+    """Gets a dictionary with the configured offers' notifications for a given
+    user and, optionally, a direction
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user.
+    direction : string
+        Optional. Direction of the trip for notifications.
+        If set, can be 'toBenalmadena' or 'toUMA'.
+
+    Returns
+    -------
+    dict
+        Dictionary with the configured notifications.
+        If no notifications are set, it will be empty.
+
+    """
+    ref = db.reference(f"/Users/{chat_id}/Notifications")
+    if not direction:
+        return ref.get()
+    else:
+        return ref.child(direction).get()
+
+def get_users_for_offer_notification(direction, weekday, time):
+    """Get list of all interested users to notify given a direction, weekday
+    and time
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the offered trip. Can be 'toBenalmadena' or 'toUMA'.
+    weekday : string
+        Week day of the offered trip. Must be one from ('Monday', ..., 'Sunday').
+    time : string
+        Departure time with ISO format 'HH:MM'
+
+    Returns
+    -------
+    list
+        chat_id's of the interested users.
+
+    """
+    ref = db.reference(f"/Notifications/Offers/{direction}")
+
+    hour = int(time[:2])
+    minutes = int(time[-2:])
+    users = set()
+
+    # Add users that get notified for every day and every hour
+    users |= set(ref.child('All days').child('All hours').get())
+    # Add users that get notified for THIS week day and every hour
+    users |= set(ref.child(weekday).child('All hours').get())
+    # Add users that get notified for every day and THIS hour
+    users |= set(ref.child('All days').child(str(hour)).get())
+    # Add users that get notified for THIS week day and THIS hour
+    users |= set(ref.child(weekday).child(str(hour)).get())
+    # If hour is o'clock, notify also the users just in the previous configured hour
+    if minutes == 0 and hour>0:
+        # Add users that get notified for every day and THIS hour
+        users |= set(ref.child('All days').child(str(hour-1)).get())
+        # Add users that get notified for THIS week day and THIS hour
+        users |= set(ref.child(weekday).child(str(hour-1)).get())
+
+    if users:
+        return list(users)
+    else:
+        return list()
+
+def modify_offer_notification(chat_id, direction, weekday=None, time_range=None):
+    """Modifies the offers' notifications for a given user, direction and,
+    optionally, week day and time range. It overwrites the previous configuration
+    for this specific combination, if it exists.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user for whom to modify the notifications.
+    direction : string
+        Direction of the trip for notifications. Can be 'toBenalmadena' or 'toUMA'.
+    weekday : string
+        Optional. Week day for the notifications.
+        If set, must be one from ('Monday', ..., 'Sunday').
+        If not passed, the notifications will be activated for all days.
+    time_range : list[2x int]
+        List of two integers indicating the start and end hours for the
+        departure time of the offered trips to be notified about them.
+
+    Returns
+    -------
+    boolean
+        True if the modification was successfull, False if the notification for
+        the chosen combination was already the same.
+
+    """
+    ref = db.reference(f"/Users/{chat_id}/Notifications/{direction}")
+    notif_dict = ref.get()
+    is_configured = False
+
+    # Update the user's dictionary
+    if weekday:
+        if weekday not in weekdays_en:
+            raise ValueError("weekday doesn't have a valid value")
+        if notif_dict!=None and weekday in notif_dict:
+            is_configured = True
+        else:
+            # If 'All days' was previously set, delete it
+            delete_offer_notification(chat_id, direction, 'All days')
+            # Also delete this weekday if it was already configured, as
+            # we are going to reconfigure it
+            delete_offer_notification(chat_id, direction, weekday)
+        # Set required reference
+        ref = ref.child(weekday)
+    else:
+        if notif_dict!=None and 'All days' in notif_dict:
+            is_configured = True
+        else:
+            delete_offer_notification(chat_id, direction)
+        ref = ref.child('All days')
+
+    # Configure user's weekday offers notifications dictionary
+    if time_range:
+        if time_range[0]>time_range[1] or time_range[0]<0 or time_range[1]>24:
+            raise ValueError("time_range list doesn't have valid values")
+        ref.set({'Start': time_range[0], 'End': time_range[1]})
+    else:
+        ref.set(True)
+
+    weekday = 'All days' if not weekday else weekday
+    # Now update the general users notifications dictionary
+    ref2 = db.reference(f"/Notifications/Offers/{direction}/{weekday}")
+
+    # If this weekday option was already configured, we only modify it
+    if is_configured:
+        if notif_dict[weekday] == True:
+            if not time_range:
+                return False    # The configuration is the same!
+            else:
+                ref2.child('All hours').child(str(chat_id)).delete()
+                hours = list(range(time_range[0], time_range[1]))
+                for hour in hours:
+                    ref2.child(str(hour)).child(str(chat_id)).set(True)
+        else:
+            old_hours = list(range(notif_dict[weekday]['Start'], notif_dict[weekday]['End']))
+            if not time_range:
+                hours_to_delete = old_hours
+                ref2.child('All hours').child(str(chat_id)).set(True)
+            else:
+                hours = list(range(time_range[0], time_range[1]))
+                if old_hours==hours:
+                    return False    # The configuration is the same!
+                hours_to_delete = list(set(old_hours)-set(hours))
+                hours = list(set(hours)-set(old_hours))
+                for hour in hours:
+                    ref2.child(str(hour)).child(str(chat_id)).set(True)
+            for hour in hours_to_delete:
+                ref2.child(str(hour)).child(str(chat_id)).delete()
+    # If this weekday didn't have a previous configuration, create it
+    else:
+        if not time_range:
+            ref2.child('All hours').child(str(chat_id)).set(True)
+        else:
+            for hour in range(time_range[0], time_range[1]):
+                ref2.child(str(hour)).child(str(chat_id)).set(True)
+
+    return True
+
+def delete_offer_notification(chat_id, direction, weekday=None):
+    """Deletes the offers' notifications for a given user, direction and week
+    day.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user for whom to delete the notifications.
+    direction : string
+        Direction of the trip for notifications. Can be 'toBenalmadena' or 'toUMA'.
+    weekday : string
+        Optional. Week day for the notifications.
+        Must be 'All days' or one from ('Monday', ..., 'Sunday').
+        If not passed, the deletion will be done for the whole direction.
+
+    Returns
+    -------
+    boolean
+        True if the deletion was successfull, False if the notification for the
+        chosen direction and weekday was not already configured.
+
+    """
+    def remove_general_weekday_notif(chat_id, direction, weekday, notif_config):
+        """Auxiliary function for other notification database functions"""
+        # General users' notifications dictionary
+        ref2 = db.reference(f"/Notifications/Offers/{direction}/{weekday}")
+        # Delete from general users' notifications dictionary
+        if notif_config == True:   # Notifications set for every hour
+            ref2.child('All hours').child(str(chat_id)).delete()
+        else:
+            start_hour = int(notif_config['Start'])
+            end_hour = int(notif_config['End'])
+            for hour in range(start_hour, end_hour):
+                ref2.child(str(hour)).child(str(chat_id)).delete()
+
+    # User's offers notifications dictionary
+    ref = db.reference(f"/Users/{chat_id}/Notifications/{direction}")
+
+    if weekday:
+        if weekday not in weekdays_en+['All days']:
+            raise ValueError("weekday doesn't have a valid value")
+        weekday_notif_dict = ref.child(weekday).get()
+        # Check if notification setting exists for this week day
+        if weekday_notif_dict==None:
+            return False
+
+        # Delete from user's dictionary
+        ref.child(weekday).delete()
+        # Delete from general users' notifications dictionary
+        remove_general_weekday_notif(chat_id, direction, weekday, weekday_notif_dict)
+    else:
+        dir_notif_dict = ref.get()
+        # Check if there is any notification set for this direction
+        if dir_notif_dict==None:
+            return False
+
+        # Delete from user's dictionary
+        ref.delete()
+        # Delete from general users' notifications dictionary
+        for weekday in dir_notif_dict:
+            remove_general_weekday_notif(chat_id, direction, weekday, dir_notif_dict[weekday])
 
     return True
