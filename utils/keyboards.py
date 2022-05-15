@@ -2,7 +2,8 @@ import logging, math
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from data.database_api import is_driver, get_name
 from messages.format import format_trip_from_data
-from utils.common import weekdays_from_today, week_isoformats, ccd, scd
+from utils.common import (weekdays, weekdays_en, weekdays_from_today,
+                            week_isoformats, ccd, scd)
 
 def config_keyboard(chat_id):
     """Creates an inline keyboard with the user configuration options.
@@ -193,3 +194,25 @@ def passengers_keyboard(chat_id_list, ikbs_list=None):
     if ikbs_list:
         keyboard += ikbs_list
     return InlineKeyboardMarkup(keyboard)
+
+def notif_weekday_keyboard(cdh, opt, ikbs_list=None):
+    weekdays_aux = ["TODOS"]+weekdays
+    weekdays_en_aux = ["ALL"]+[wd[:3].upper() for wd in weekdays_en]
+
+    keyboard = []
+    row = []
+
+    for i in range(len(weekdays_aux)):
+        if i!=0 and i%3==0:
+            keyboard.append(row)
+            row = []
+        row.append(InlineKeyboardButton(weekdays_aux[i],
+                    callback_data=ccd(cdh,opt,weekdays_en_aux[i])))
+    keyboard.append(row)
+
+    if ikbs_list:
+        keyboard += ikbs_list
+    return InlineKeyboardMarkup(keyboard)
+
+def notif_time_keyboard(cdh, opt, first_hour=0, last_hour=24, ikbs_list=None):
+    return

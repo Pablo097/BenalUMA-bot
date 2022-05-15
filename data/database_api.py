@@ -798,15 +798,25 @@ def get_offer_notification_by_user(chat_id, direction=None):
     Returns
     -------
     dict
-        Dictionary with the configured notifications.
+        Ordered-by-weekday Dictionary with the configured notifications.
         If no notifications are set, it will be empty.
 
     """
     ref = db.reference(f"/Users/{chat_id}/Notifications")
+
+    wd_aux = ['All days'] + weekdays_en
+
     if not direction:
-        return ref.get()
+        notif_dict = ref.get()
+        if notif_dict:
+            for dir in notif_dict:
+                notif_dict[dir] = dict(sorted(notif_dict[dir].items(), key=lambda x: wd_aux.index(x[0])))
     else:
-        return ref.child(direction).get()
+        notif_dict = ref.child(direction).get()
+        if notif_dict:
+            notif_dict = dict(sorted(notif_dict.items(), key=lambda x: wd_aux.index(x[0])))
+
+    return notif_dict
 
 def get_users_for_offer_notification(direction, weekday, time):
     """Get list of all interested users to notify given a direction, weekday

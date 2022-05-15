@@ -87,7 +87,7 @@ def send_select_more_message(update, context):
                 [InlineKeyboardButton("Terminar", callback_data="TRIP_DONE")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = f"Tu viaje se publicará con los siguientes datos::\n\n"
+    text = f"Tu viaje se publicará con los siguientes datos:\n\n"
     text = escape_markdown(text, 2)
     text += format_trip_from_data(dir, date, time=time, slots=slots, fee=price)
     text2 = f"\n\nPuedes especificar los asientos disponibles y/o el precio"\
