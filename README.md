@@ -13,7 +13,7 @@ git clone https://github.com/Pablo097/BenalUMA-bot.git BenalUMAbot
 
 Go inside the project folder and install the dependencies through the `requirements.txt` file
 ```bash
-  pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 In the parent folder to the one where you have cloned the project (`BenalUMAbot`), create a file named `.env` where the environment variables will be stored. The Telegram bot token is obtained talking to the [@BotFather](https://t.me/BotFather), and the Firebase authentication information is downloaded from the Firebase project configuration. The content of the `.env` file must look like this:
@@ -41,7 +41,7 @@ bot.main(False)
 
 Last, install the required dependency for this file:
 ```bash
-  pip install python-dotenv
+pip install python-dotenv
 ```
 
 Finally, start the bot by running `debug_bot.py`.
