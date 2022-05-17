@@ -20,7 +20,7 @@ def notify_new_trip(context, direction, chat_id, date, time, slots=None, fee=Non
         fee = get_fee(chat_id)
 
     text = "🔵 Se ha publicado un nuevo viaje:\n\n"
-    text += format_trip_from_data(direction, date, chat_id, time, slots, fee)
+    text += format_trip_from_data(direction, date, chat_id, time, slots, fee=fee)
     text += f"\n\nSi te interesa reservar un asiento, puedes hacerlo a través"\
             f" del comando /verofertas\."
 

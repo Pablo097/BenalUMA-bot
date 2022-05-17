@@ -102,7 +102,7 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         if slots:
             fields.append(f"💺 *Asientos disponibles*: `{str(slots)}`")
         if car:
-            fields.append(f"🚘 *Descripción vehículo*: `{escape_markdown(get_car(chat_id),2)}`")
+            fields.append(f"🚘 *Descripción vehículo*: `{escape_markdown(car,2)}`")
         if fee:
             fields.append(f"💰 *Precio*: `{str(fee).replace('.',',')}€`")
         if bizum != None:
@@ -124,7 +124,7 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         if slots:
             fields.append(f"💺 {str(slots)}")
         if car:
-            fields.append(f"🚘 {get_car(chat_id)}")
+            fields.append(f"🚘 {escape_markdown(car,2)}")
         if fee:
             fields.append(f"💰 {str(fee).replace('.',',')}€")
         if bizum != None:

@@ -606,7 +606,7 @@ def get_trips_by_passenger(chat_id, date_start=None, date_end=None, order_by_dat
             for dir in trips_dict:
                 dates = dates.union(set(trips_dict[dir]))
             # We want to present the trips by date
-            for date in dates:
+            for date in sorted(dates):
                 date_trips = dict()
                 for dir in trips_dict:
                     if date in trips_dict[dir]:
