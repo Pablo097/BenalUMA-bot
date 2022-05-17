@@ -1,7 +1,11 @@
 import logging, telegram
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackContext
-from data.database_api import add_user, add_driver, is_registered, is_driver, set_fee
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
+                                ConversationHandler, CallbackContext)
+from data.database_api import (add_user, add_driver, is_registered, is_driver,
+                                set_fee, modify_offer_notification,
+                                modify_request_notification)
+from messages.message_queue import send_message
 from utils.common import *
 
 REG_NAME, REG_USAGE, REG_SLOTS, REG_CAR = range(4)
@@ -31,6 +35,8 @@ def help(update, context):
             text += f"\n🎟️ /misreservas - Muestra tus viajes reservados esta semana."
             # text += f"\n📕 /pedirviaje - Inicia el asistente para crear una nueva"\
             #         f" demanda de viaje."
+            text += f"\n🔔 /notificaciones - Permite configurar tus notificaciones "\
+                    f"sobre nuevos viajes y peticiones."
         else:
             text += f"\n🔑 /registro - Comienza a usar BenalUMA registrándote en el sistema."
 
@@ -78,6 +84,13 @@ def register_usage(update, context):
     else:
         text = f"Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
         update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
+        modify_offer_notification(update.effective_chat.id, 'toBenalmadena')
+        modify_offer_notification(update.effective_chat.id, 'toUMA')
+        text = f"Como pasajero, se te ha aplicado una configuración de notificaciones"\
+               f" por defecto para que se te avise cada vez que un nuevo viaje"\
+               f" sea publicado. Puedes cambiar esta configuración con el comando"\
+               f" /notificaciones."
+        send_message(context, update.effective_chat.id, text)
         text = f"Un aviso antes de que empieces a ofertar/reservar viajes:\nEste"\
                f" bot necesita poder enlazar a tu perfil para que los demás"\
                f" usuarios puedan contactar contigo por privado en caso de que"\
@@ -87,7 +100,8 @@ def register_usage(update, context):
                f" en **'Privacidad y Seguridad' > 'Mensajes reenviados'**, tengas"\
                f" marcada la opción __Todos__ o, al menos, añadas este bot como "\
                f" excepción.\n¡Buen viaje! "
-        update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        send_message(context, update.effective_chat.id, text,
+                                parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return ConversationHandler.END
 
 def register_slots(update, context):
@@ -110,9 +124,27 @@ def register_car(update, context):
 
     text = f"Te has registrado correctamente. Se te ha configurado un precio"\
            f" por trayecto de {str(MAX_FEE).replace('.',',')}€ por defecto."\
-           f" Puedes cambiar esto y más ajustes con el comando /config."
+           f" Puedes cambiar esto y más ajustes con el comando /config."\
+           f"\n¡Ya puedes empezar a usar el bot!"
     update.message.reply_text(text)
-    update.message.reply_text("¡Ya puedes empezar a usar el bot!")
+    modify_request_notification(update.effective_chat.id, 'toBenalmadena')
+    modify_request_notification(update.effective_chat.id, 'toUMA')
+    text = f"Como conductor, se te ha aplicado una configuración de notificaciones"\
+           f" por defecto para que se te avise cada vez que alguien realiza una"\
+           f" nueva petición de viaje. Puedes cambiar esta configuración con el"\
+           f" comando /notificaciones."
+    send_message(context, update.effective_chat.id, text)
+    text = f"Un aviso antes de que empieces a ofertar/reservar viajes:\nEste"\
+           f" bot necesita poder enlazar a tu perfil para que los demás"\
+           f" usuarios puedan contactar contigo por privado en caso de que"\
+           f" sea necesario (por ejemplo, para tratar detalles más específi"\
+           f"cos del trayecto).\nPara asegurarte de que el bot puede hacerlo"\
+           f" correctamente, por favor, comprueba que en los ajustes de Telegram,"\
+           f" en **'Privacidad y Seguridad' > 'Mensajes reenviados'**, tengas"\
+           f" marcada la opción __Todos__ o, al menos, añadas este bot como "\
+           f" excepción.\n¡Buen viaje! "
+    send_message(context, update.effective_chat.id, text,
+                            parse_mode=telegram.ParseMode.MARKDOWN_V2)
 
     return ConversationHandler.END
 

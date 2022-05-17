@@ -4,7 +4,8 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
 from data.database_api import (is_registered, is_driver, set_name, set_car,
-                                set_slots, set_bizum, set_fee, add_driver)
+                                set_slots, set_bizum, set_fee, add_driver,
+                                modify_offer_notification, modify_request_notification)
 from messages.format import get_formatted_user_config
 from messages.notifications import delete_driver_notify, delete_user_notify
 from utils.keyboards import config_keyboard
@@ -257,13 +258,23 @@ def update_user_property_callback(update, context):
         if role=='Conductor':
             add_driver(update.effective_chat.id, 3, "")
             set_fee(update.effective_chat.id, MAX_FEE)
+            modify_request_notification(update.effective_chat.id, 'toBenalmadena')
+            modify_request_notification(update.effective_chat.id, 'toUMA')
             text = f"Rol cambiado a conductor correctamente."\
-                   f"\nSe te aplicado una configuración por defecto. Por favor,"\
+                   f"\n\nSe te aplicado una configuración por defecto. Por favor,"\
                    f" configura correctamente al menos tu número de asientos y"\
-                   f" la descripción de tu coche."
+                   f" la descripción de tu coche.\n\nAdemás, se te han activado"\
+                   f" las notificaciones sobre peticiones de viaje. Puedes cambiar"\
+                   f" tus preferencias sobre ello con el comando /notificaciones."
         elif role=='Pasajero':
             delete_driver_notify(update, context, update.effective_chat.id)
+            modify_offer_notification(update.effective_chat.id, 'toBenalmadena')
+            modify_offer_notification(update.effective_chat.id, 'toUMA')
             text = f"Rol cambiado a pasajero correctamente."
+            text += f"\n\nSe te han activado las notificaciones sobre ofertas de"\
+                    f" viajes. También se han desactivado para nuevas peticiones,"\
+                    f" que no están disponibles para pasajeros. Puedes cambiar"\
+                    f" esta configuración con el comando /notificaciones."
     elif option == 'delete':
         delete_user_notify(update, context, update.effective_chat.id)
         text = f"Tu cuenta se ha eliminado correctamente. \n¡Que te vaya bien! 🖖"

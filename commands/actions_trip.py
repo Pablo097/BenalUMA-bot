@@ -5,6 +5,7 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
 from telegram.utils.helpers import escape_markdown
 from data.database_api import add_trip, get_fee, get_slots
 from messages.format import format_trip_from_data, get_formatted_trip_for_driver
+from messages.notifications import notify_new_trip
 from utils.keyboards import weekdays_keyboard
 from utils.time_picker import (time_picker_keyboard, process_time_callback)
 from utils.common import *
@@ -202,11 +203,11 @@ def publish_trip(update, context):
     price = context.user_data.pop('trip_price', None)
     trip_key = add_trip(dir, update.effective_chat.id, date, time, slots, price)
 
-    # TODO: Notify users (maybe inside database function)
-
     text = escape_markdown("Perfecto. ¡Tu viaje se ha publicado!\n\n",2)
     text += get_formatted_trip_for_driver(dir, date, trip_key)
     query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+
+    notify_new_trip(context, dir, update.effective_chat.id, date, time, slots, price)
 
     for key in list(context.user_data.keys()):
         if key.startswith('trip_'):
@@ -217,12 +218,6 @@ def trip_abort(update, context):
     """Aborts trip conversation."""
     query = update.callback_query
     query.answer()
-    # if 'trip_message' in context.user_data:
-    #     context.user_data.pop('trip_message')
-    # if 'trip_dir' in context.user_data:
-    #     context.user_data.pop('trip_dir')
-    # if 'trip_date' in context.user_data:
-    #     context.user_data.pop('trip_date')
     for key in list(context.user_data.keys()):
         if key.startswith('trip_'):
             del context.user_data[key]

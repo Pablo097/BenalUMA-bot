@@ -1,11 +1,11 @@
-import logging
-import re
+import logging, re
 from datetime import datetime
 from data.database_api import (get_name, is_driver, get_slots, get_car,
                                get_fee, get_bizum, get_trip,
                                get_trips_by_date_range, get_trips_by_driver,
                                get_trips_by_passenger,
-                               get_offer_notification_by_user)
+                               get_offer_notification_by_user,
+                               get_request_notification_by_user)
 from telegram.utils.helpers import escape_markdown
 from utils.common import *
 
@@ -40,10 +40,12 @@ def get_formatted_user_config(chat_id):
         if fee != None:
             string += f"\n💰 *Precio por trayecto*: `{str(fee).replace('.',',')}€`"
         bizum = get_bizum(chat_id)
-        if bizum == True:
-            string += f"\n💳 `Aceptas Bizum`"
-        elif bizum == False:
-            string += f"\n💳🚫 `NO aceptas Bizum`"
+        # if bizum == True:
+        #     string += f"\n💳 `Aceptas Bizum`"
+        # elif bizum == False:
+        #     string += f"\n💳🚫 `NO aceptas Bizum`"
+        if bizum != None:
+            string +=f"\n💳 *Bizum*: `{'P' if bizum else '🚫 NO p'}ermitido`"
 
     return string
 
@@ -368,7 +370,7 @@ def get_formatted_offers_notif_config(chat_id, direction=None):
             else:
                 start_hour = dir_notif_dict[weekday]['Start']
                 end_hour = dir_notif_dict[weekday]['End']
-                weekday_string += f"{start_hour:02}h-{end_hour:02}h"
+                weekday_string += f"{start_hour}h \- {end_hour}h"
             wd_string_list.append(weekday_string)
         if wd_string_list:
             string = "\n".join(wd_string_list)
@@ -378,7 +380,44 @@ def get_formatted_offers_notif_config(chat_id, direction=None):
         dir_string_list = []
         dir_string = ""
         for dir in notif_dict:
-            dir_string = f"Hacia {dir[2:]}:\n"
+            dir_string = f"➡️ Hacia {dir[2:]}:\n"
+            dir_string += format_dir(notif_dict[dir])
+            dir_string_list.append(dir_string)
+        if dir_string_list:
+            string = "\n\n".join(dir_string_list)
+    else:
+        string = format_dir(notif_dict)
+
+    return string
+
+def get_formatted_requests_notif_config(chat_id, direction=None):
+    notif_dict = get_request_notification_by_user(chat_id, direction)
+    string = ""
+
+    if not notif_dict:
+        return string
+
+    def format_dir(dir_notif_dict):
+        string=""
+        wd_string_list = []
+        for weekday in dir_notif_dict:
+            weekday_string = f"• *{'Cada día' if weekday=='All days' else weekdays[weekdays_en.index(weekday)]}*: "
+            if dir_notif_dict[weekday] == True:
+                weekday_string += f"Todas horas"
+            else:
+                start_hour = dir_notif_dict[weekday]['Start']
+                end_hour = dir_notif_dict[weekday]['End']
+                weekday_string += f"{start_hour}h \- {end_hour}h"
+            wd_string_list.append(weekday_string)
+        if wd_string_list:
+            string = "\n".join(wd_string_list)
+        return string
+
+    if not direction:
+        dir_string_list = []
+        dir_string = ""
+        for dir in notif_dict:
+            dir_string = f"➡️ Hacia {dir[2:]}:\n"
             dir_string += format_dir(notif_dict[dir])
             dir_string_list.append(dir_string)
         if dir_string_list:

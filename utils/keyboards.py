@@ -215,4 +215,17 @@ def notif_weekday_keyboard(cdh, opt, ikbs_list=None):
     return InlineKeyboardMarkup(keyboard)
 
 def notif_time_keyboard(cdh, opt, first_hour=0, last_hour=24, ikbs_list=None):
-    return
+    keyboard = []
+    row = []
+
+    for i in range(last_hour, first_hour-1, -1):
+        if i!=last_hour and (last_hour-i)%6==0:
+            keyboard.insert(0, row)
+            row = []
+        row.insert(0, InlineKeyboardButton(str(i),
+                    callback_data=ccd(cdh,opt,str(i))))
+    keyboard.insert(0, row)
+
+    if ikbs_list:
+        keyboard += ikbs_list
+    return InlineKeyboardMarkup(keyboard)

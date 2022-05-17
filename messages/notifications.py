@@ -1,14 +1,34 @@
 import logging, telegram, math
 from telegram.ext import CallbackContext
 from telegram.utils.helpers import escape_markdown
+from datetime import datetime
 from data.database_api import (is_driver, delete_user, delete_driver,
                                 get_trips_by_driver, get_trip_passengers,
-                                get_trip_time, delete_trip, remove_passenger)
-from messages.format import (get_formatted_trip_for_passenger)
+                                get_trip_time, delete_trip, remove_passenger,
+                                get_slots, get_fee,
+                                get_users_for_offer_notification)
+from messages.format import (get_formatted_trip_for_passenger, format_trip_from_data)
 from messages.message_queue import send_message
 from utils.common import *
 
 logger = logging.getLogger(__name__)
+
+def notify_new_trip(context, direction, chat_id, date, time, slots=None, fee=None):
+    if not slots:
+        slots = get_slots(chat_id)
+    if not fee:
+        fee = get_fee(chat_id)
+
+    text = "🔵 Se ha publicado un nuevo viaje:\n\n"
+    text += format_trip_from_data(direction, date, chat_id, time, slots, fee)
+    text += f"\n\nSi te interesa reservar un asiento, puedes hacerlo a través"\
+            f" del comando /verofertas\."
+
+    # Obtain list of interested users for this trip
+    weekday = weekdays[datetime.fromisoformat(date).weekday()]
+    user_ids = get_users_for_offer_notification(direction, weekday, time)
+
+    send_message(context, user_ids, text, telegram.ParseMode.MARKDOWN_V2)
 
 def delete_trip_notify(update, context, direction, date, key):
     # Notify possible passengers
