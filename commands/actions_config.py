@@ -14,6 +14,7 @@ from utils.decorators import registered
 
 (CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE,
     CHANGING_SLOTS, CHANGING_BIZUM, CHOOSING_ADVANCED_OPTION) = range(6)
+cdh = 'CONFIG'   # Callback Data Header
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,12 @@ def config_restart(update, context):
     """Gives options for changing the user configuration"""
     query = update.callback_query
     query.answer()
+
+    # Delete possible previous data
+    for key in list(context.user_data.keys()):
+        if key.startswith('config_') and key!='config_message':
+            del context.user_data[key]
+
     reply_markup = config_keyboard(update.effective_chat.id)
 
     text = f"Esta es tu configuración actual: \n"
@@ -54,13 +61,13 @@ def config_select_advanced(update, context):
     role = 'Pasajero' if is_driver(update.effective_chat.id) else 'Conductor'
     keyboard = [
         [
-            InlineKeyboardButton(f"Cambiar rol a {role}", callback_data="CONFIG_ROLE"),
+            InlineKeyboardButton(f"Cambiar rol a {role}", callback_data=ccd(cdh,"ROLE")),
         ],
         [
-            InlineKeyboardButton("Eliminar cuenta", callback_data="CONFIG_DELETE_ACCOUNT"),
+            InlineKeyboardButton("Eliminar cuenta", callback_data=ccd(cdh,"DELETE_ACCOUNT")),
         ],
         [
-            InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK"),
+            InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK")),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -74,7 +81,7 @@ def change_name(update, context):
     """Lets user change their username"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK")]]
+    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK"))]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = f"⚠️ AVISO: Tu nombre y apellidos ayudan a los demás usuarios a reconocerte,"\
@@ -92,17 +99,17 @@ def config_slots(update, context):
     query.answer()
     keyboard = [
         [
-            InlineKeyboardButton(emoji_numbers[1], callback_data="1"),
-            InlineKeyboardButton(emoji_numbers[2], callback_data="2"),
-            InlineKeyboardButton(emoji_numbers[3], callback_data="3"),
+            InlineKeyboardButton(emoji_numbers[1], callback_data=ccd(cdh,"1")),
+            InlineKeyboardButton(emoji_numbers[2], callback_data=ccd(cdh,"2")),
+            InlineKeyboardButton(emoji_numbers[3], callback_data=ccd(cdh,"3")),
         ],
         [
-            InlineKeyboardButton(emoji_numbers[4], callback_data="4"),
-            InlineKeyboardButton(emoji_numbers[5], callback_data="5"),
-            InlineKeyboardButton(emoji_numbers[6], callback_data="6"),
+            InlineKeyboardButton(emoji_numbers[4], callback_data=ccd(cdh,"4")),
+            InlineKeyboardButton(emoji_numbers[5], callback_data=ccd(cdh,"5")),
+            InlineKeyboardButton(emoji_numbers[6], callback_data=ccd(cdh,"6")),
         ],
         [
-            InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK"),
+            InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK")),
         ]
     ]
 
@@ -119,11 +126,11 @@ def config_bizum(update, context):
     query.answer()
     keyboard = [
         [
-            InlineKeyboardButton("Sí", callback_data="Yes"),
-            InlineKeyboardButton("No", callback_data="No"),
+            InlineKeyboardButton("Sí", callback_data=ccd(cdh,"YES")),
+            InlineKeyboardButton("No", callback_data=ccd(cdh,"NO")),
         ],
         [
-            InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK"),
+            InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK")),
         ]
     ]
 
@@ -138,7 +145,7 @@ def change_car(update, context):
     """Lets driver change their car description"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK")]]
+    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK"))]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = "Escribe la descripción actualizada de tu coche."
@@ -151,7 +158,7 @@ def change_fee(update, context):
     """Lets driver change their fee"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data="CONFIG_BACK")]]
+    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK"))]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = ("Escribe el precio del trayecto por pasajero (máximo 1,5€).")
@@ -165,8 +172,8 @@ def change_role(update, context):
     query = update.callback_query
     query.answer()
     role = context.user_data['role']
-    keyboard = [[InlineKeyboardButton("Sí", callback_data="Yes"),
-                 InlineKeyboardButton("No", callback_data="CONFIG_BACK")]]
+    keyboard = [[InlineKeyboardButton("Sí", callback_data=ccd(cdh,"YES")),
+                 InlineKeyboardButton("No", callback_data=ccd(cdh,"BACK"))]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"Vas a cambiar tu rol habitual a {role}."
@@ -188,8 +195,8 @@ def config_delete_account(update, context):
     """Asks user if they really want to delete their account"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("Sí", callback_data="Yes"),
-                 InlineKeyboardButton("No", callback_data="CONFIG_BACK")]]
+    keyboard = [[InlineKeyboardButton("Sí", callback_data=ccd(cdh,"YES")),
+                 InlineKeyboardButton("No", callback_data=ccd(cdh,"BACK"))]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"⚠️⚠️ Vas a eliminar tu cuenta del bot de BenalUMA. ⚠️⚠️"\
@@ -244,13 +251,17 @@ def update_user_property_callback(update, context):
     query = update.callback_query
     query.answer()
 
+    data = scd(query.data)
+    if data[0]!=cdh:
+        raise SyntaxError('This callback data does not belong to the update_user_property_callback function.')
+
     text = ""
     option = context.user_data.pop('config_option')
     if option == 'slots':
-        set_slots(update.effective_chat.id, int(query.data))
+        set_slots(update.effective_chat.id, int(data[1]))
         text = f"Número de asientos disponibles cambiado correctamente."
     elif option == 'bizum':
-        bizum_flag = True if query.data=="Yes" else False
+        bizum_flag = True if data[1]=="YES" else False
         set_bizum(update.effective_chat.id, bizum_flag)
         text = f"Preferencia de Bizum modificada correctamente."
     elif option == 'role':
@@ -309,32 +320,32 @@ def add_handlers(dispatcher):
         entry_points=[CommandHandler('config', config)],
         states={
             CONFIG_SELECT: [
-                CallbackQueryHandler(change_name, pattern='^CONFIG_NAME$'),
-                CallbackQueryHandler(config_slots, pattern='^CONFIG_SLOTS$'),
-                CallbackQueryHandler(config_bizum, pattern='^CONFIG_BIZUM$'),
-                CallbackQueryHandler(change_car, pattern='^CONFIG_CAR$'),
-                CallbackQueryHandler(change_fee, pattern='^CONFIG_FEE$'),
-                CallbackQueryHandler(config_end, pattern='^CONFIG_END$'),
-                CallbackQueryHandler(config_select_advanced, pattern='^CONFIG_ADVANCED$'),
+                CallbackQueryHandler(change_name, pattern=f"^{ccd(cdh,'NAME')}$"),
+                CallbackQueryHandler(config_slots, pattern=f"^{ccd(cdh,'SLOTS')}$"),
+                CallbackQueryHandler(config_bizum, pattern=f"^{ccd(cdh,'BIZUM')}$"),
+                CallbackQueryHandler(change_car, pattern=f"^{ccd(cdh,'CAR')}$"),
+                CallbackQueryHandler(change_fee, pattern=f"^{ccd(cdh,'FEE')}$"),
+                CallbackQueryHandler(config_end, pattern=f"^{ccd(cdh,'END')}$"),
+                CallbackQueryHandler(config_select_advanced, pattern=f"^{ccd(cdh,'ADVANCED')}$"),
             ],
             CONFIG_SELECT_ADVANCED: [
-                CallbackQueryHandler(change_role, pattern='^CONFIG_ROLE$'),
-                CallbackQueryHandler(config_delete_account, pattern='^CONFIG_DELETE_ACCOUNT$'),
+                CallbackQueryHandler(change_role, pattern=f"^{ccd(cdh,'ROLE')}$"),
+                CallbackQueryHandler(config_delete_account, pattern=f"^{ccd(cdh,'DELETE_ACCOUNT')}$"),
             ],
             CHANGING_MESSAGE: [
                 MessageHandler(Filters.text & ~Filters.command, update_user_property),
             ],
             CHANGING_SLOTS: [
-                CallbackQueryHandler(update_user_property_callback, pattern='^(1|2|3|4|5|6)$')
+                CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'(1|2|3|4|5|6)')}$")
             ],
             CHANGING_BIZUM: [
-                CallbackQueryHandler(update_user_property_callback, pattern='^(Yes|No)$')
+                CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'(YES|NO)')}$")
             ],
             CHOOSING_ADVANCED_OPTION: [
-                CallbackQueryHandler(update_user_property_callback, pattern='^Yes$')
+                CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'YES')}$")
             ]
         },
-        fallbacks=[CallbackQueryHandler(config_restart, pattern='^CONFIG_BACK$'),
+        fallbacks=[CallbackQueryHandler(config_restart, pattern=f"^{ccd(cdh,'BACK')}$"),
                    CommandHandler('config', config)],
     )
 

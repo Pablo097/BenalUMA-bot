@@ -19,9 +19,10 @@ from utils.decorators import registered
 # 'See Offers' conversation points
 (SO_START, SO_DATE, SO_HOUR, SO_HOUR_SELECT_RANGE_START,
             SO_HOUR_SELECT_RANGE_STOP, SO_VISUALIZE) = range(10,16)
+cdh = 'SO'   # Callback Data Header
 
 # Abort/Cancel buttons
-ikbs_cancel_SO = [[InlineKeyboardButton("Cancelar", callback_data="SO_CANCEL")]]
+ikbs_cancel_SO = [[InlineKeyboardButton("Cancelar", callback_data=ccd(cdh,"CANCEL"))]]
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,9 @@ def see_offers(update, context):
         sent_message = context.user_data.pop('SO_message')
         sent_message.edit_reply_markup(None)
 
-    keyboard = [[InlineKeyboardButton("Hacia la UMA", callback_data="DIR_UMA"),
-                 InlineKeyboardButton("Hacia Benalmádena", callback_data="DIR_BEN")]]
+    opt = 'DIR'
+    keyboard = [[InlineKeyboardButton("Hacia la UMA", callback_data=ccd(cdh,opt,'UMA')),
+                 InlineKeyboardButton("Hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
     keyboard += ikbs_cancel_SO
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -47,9 +49,13 @@ def SO_select_date(update, context):
     query = update.callback_query
     query.answer()
 
-    if query.data == "DIR_UMA":
+    data = scd(query.data)
+    if not (data[0]==cdh and data[1]=='DIR'):
+        raise SyntaxError('This callback data does not belong to the SO_select_date function.')
+
+    if data[2]  == "UMA":
         context.user_data['SO_dir'] = 'toUMA'
-    elif query.data == "DIR_BEN":
+    elif data[2]  == "BEN":
         context.user_data['SO_dir'] = 'toBenalmadena'
     else:
         logger.warning("Error in SO direction argument.")
@@ -57,7 +63,7 @@ def SO_select_date(update, context):
         query.edit_message_text(text=text, reply_markup=None)
         return ConversationHandler.END
 
-    reply_markup = weekdays_keyboard(ikbs_cancel_SO)
+    reply_markup = weekdays_keyboard(cdh, ikbs_cancel_SO)
     text = f"De acuerdo. ¿Para qué día quieres ver los viajes ofertados?"
     query.edit_message_text(text=text, reply_markup=reply_markup)
     return SO_DATE
@@ -66,12 +72,16 @@ def SO_select_hour(update, context):
     query = update.callback_query
     query.answer()
 
-    context.user_data['SO_date'] = query.data
+    data = scd(query.data)
+    if data[0]!=cdh:
+        raise SyntaxError('This callback data does not belong to the SO_select_hour function.')
+
+    context.user_data['SO_date'] = data[1]
     text = f"Por último, ¿quieres ver todos los viajes ofertados para este día,"\
            f" o prefieres indicar el rango horario en el que estás interesado?"
 
-    keyboard = [[InlineKeyboardButton("Ver todos", callback_data="SO_ALL"),
-                 InlineKeyboardButton("Indicar rango horario", callback_data="SO_RANGE")]]
+    keyboard = [[InlineKeyboardButton("Ver todos", callback_data=ccd(cdh,'ALL')),
+                 InlineKeyboardButton("Indicar rango horario", callback_data=ccd(cdh,'RANGE'))]]
     keyboard += ikbs_cancel_SO
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.edit_message_text(text=text, reply_markup=reply_markup)
@@ -243,16 +253,9 @@ def SO_cancel(update, context):
     """Cancels see offers conversation."""
     query = update.callback_query
     query.answer()
-    if 'SO_message' in context.user_data:
-        context.user_data.pop('SO_message')
-    if 'SO_dir' in context.user_data:
-        context.user_data.pop('SO_dir')
-    if 'SO_date' in context.user_data:
-        context.user_data.pop('SO_date')
-    if 'SO_time_start' in context.user_data:
-        context.user_data.pop('SO_time_start')
-    if 'SO_time_stop' in context.user_data:
-        context.user_data.pop('SO_time_stop')
+    for key in list(context.user_data.keys()):
+        if key.startswith('SO_'):
+            del context.user_data[key]
     query.edit_message_text(text="Se ha cancelado la visualización de viajes ofertados.")
     return ConversationHandler.END
 
@@ -260,12 +263,9 @@ def SO_end(update, context):
     """End the conversation when offers have already been shown"""
     query = update.callback_query
     query.answer()
-    if 'SO_message' in context.user_data:
-        context.user_data.pop('SO_message')
-    if 'SO_dir' in context.user_data:
-        context.user_data.pop('SO_dir')
-    if 'SO_date' in context.user_data:
-        context.user_data.pop('SO_date')
+    for key in list(context.user_data.keys()):
+        if key.startswith('SO_'):
+            del context.user_data[key]
     query.edit_message_text(text="Ok, no se ha pedido ninguna reserva.")
     return ConversationHandler.END
 
@@ -333,40 +333,40 @@ def alert_user(update, context):
                             notify_id = driver_id)
 
 def add_handlers(dispatcher):
-    regex_iso_date = '^([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])$'
+    regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'
 
     # Create conversation handler for 'see offers'
     SO_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('verofertas', see_offers)],
         states={
             SO_START: [
-                CallbackQueryHandler(SO_select_date, pattern='^(DIR_UMA|DIR_BEN)$'),
+                CallbackQueryHandler(SO_select_date, pattern=f"^{ccd(cdh,'DIR','(UMA|BEN)')}$"),
             ],
             SO_DATE: [
-                CallbackQueryHandler(SO_select_hour, pattern=regex_iso_date),
+                CallbackQueryHandler(SO_select_hour, pattern=f"^{ccd(cdh,regex_iso_date)}$"),
             ],
             SO_HOUR: [
-                CallbackQueryHandler(SO_select_hour_range_start, pattern='^(SO_RANGE)$'),
-                CallbackQueryHandler(SO_visualize, pattern='^(SO_ALL)$'),
+                CallbackQueryHandler(SO_select_hour_range_start, pattern=f"^{ccd(cdh,'RANGE')}$"),
+                CallbackQueryHandler(SO_visualize, pattern=f"^{ccd(cdh,'ALL')}$"),
             ],
             SO_HOUR_SELECT_RANGE_START: [
-                CallbackQueryHandler(SO_select_hour_range_stop, pattern='^TIME_PICKER.*'),
+                CallbackQueryHandler(SO_select_hour_range_stop, pattern="^TIME_PICKER.*"),
                 MessageHandler(Filters.text & ~Filters.command, SO_select_hour_range_stop),
             ],
             SO_HOUR_SELECT_RANGE_STOP: [
-                CallbackQueryHandler(SO_visualize, pattern='^TIME_PICKER.*'),
+                CallbackQueryHandler(SO_visualize, pattern="^TIME_PICKER.*"),
                 MessageHandler(Filters.text & ~Filters.command, SO_visualize),
             ],
             SO_VISUALIZE: [
-                CallbackQueryHandler(SO_reserve, pattern='^TRIP_ID[^\ \n]*'),
-                CallbackQueryHandler(SO_end, pattern='^SO_CANCEL$'),
+                CallbackQueryHandler(SO_reserve, pattern="^TRIP_ID[^\ \n]*"),
+                CallbackQueryHandler(SO_end, pattern=f"^{ccd(cdh,'CANCEL')}$"),
             ]
         },
-        fallbacks=[CallbackQueryHandler(SO_cancel, pattern='^SO_CANCEL$'),
+        fallbacks=[CallbackQueryHandler(SO_cancel, pattern=f"^{ccd(cdh,'CANCEL')}$"),
                    CommandHandler('verofertas', see_offers)],
     )
 
     dispatcher.add_handler(SO_conv_handler)
 
     # Create Callback Query handler for 'alert user'
-    dispatcher.add_handler(CallbackQueryHandler(alert_user, pattern='^ALERT.*'))
+    dispatcher.add_handler(CallbackQueryHandler(alert_user, pattern="^ALERT.*"))

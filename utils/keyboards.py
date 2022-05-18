@@ -18,30 +18,34 @@ def config_keyboard(chat_id):
     InlineKeyboardMarkup
 
     """
+    cdh = 'CONFIG'
     keyboard = [
         [
-            InlineKeyboardButton("Cambiar nombre de usuario", callback_data="CONFIG_NAME"),
+            InlineKeyboardButton("Cambiar nombre de usuario", callback_data=ccd(cdh,"NAME")),
         ]
     ]
     if is_driver(chat_id):
         keyboard += [
             [
-                InlineKeyboardButton("Asientos libres", callback_data="CONFIG_SLOTS"),
-                InlineKeyboardButton("Aceptar Bizum", callback_data="CONFIG_BIZUM"),
+                InlineKeyboardButton("Asientos libres", callback_data=ccd(cdh,"SLOTS")),
+                InlineKeyboardButton("Aceptar Bizum", callback_data=ccd(cdh,"BIZUM")),
             ], [
-                InlineKeyboardButton("Descripción vehículo", callback_data="CONFIG_CAR"),
-                InlineKeyboardButton("Establecer precio", callback_data="CONFIG_FEE"),
+                InlineKeyboardButton("Descripción vehículo", callback_data=ccd(cdh,"CAR")),
+                InlineKeyboardButton("Establecer precio", callback_data=ccd(cdh,"FEE")),
             ]
         ]
-    keyboard += [[InlineKeyboardButton("Configuración avanzada", callback_data="CONFIG_ADVANCED")],
-                 [InlineKeyboardButton("Terminar", callback_data="CONFIG_END")]]
+    keyboard += [[InlineKeyboardButton("Configuración avanzada", callback_data=ccd(cdh,"ADVANCED"))],
+                 [InlineKeyboardButton("Terminar", callback_data=ccd(cdh,"END"))]]
     return InlineKeyboardMarkup(keyboard)
 
-def weekdays_keyboard(ikbs_list=None):
+def weekdays_keyboard(cdh, ikbs_list=None):
     """Creates an inline keyboard with the following 7 days of the week.
 
     Parameters
     ----------
+    cdh : string
+        Callback Data Header: Word to add at the beginning of each of the
+        callback datas for better identification.
     ikbs_list : List[List[telegram.InlineKeyboardButton]]
         If not None, the buttons in this list will be added at the bottom of
         the keyboard
@@ -57,19 +61,19 @@ def weekdays_keyboard(ikbs_list=None):
     week_strings = week_isoformats()
     day_string = [weekdate.split('-')[-1].lstrip('0')for weekdate in week_strings]
     keyboard = [[InlineKeyboardButton(f"Hoy ({weekdays_aux[0]} {day_string[0]})",
-                                        callback_data=week_strings[0]),
+                                        callback_data=ccd(cdh,week_strings[0])),
                  InlineKeyboardButton(f"Mañana ({weekdays_aux[1]} {day_string[1]})",
-                                        callback_data=week_strings[1])],
+                                        callback_data=ccd(cdh,week_strings[1]))],
                 [InlineKeyboardButton(f"{weekdays_aux[2]} {day_string[2]}",
-                                        callback_data=week_strings[2]),
+                                        callback_data=ccd(cdh,week_strings[2])),
                  InlineKeyboardButton(f"{weekdays_aux[3]} {day_string[3]}",
-                                        callback_data=week_strings[3])],
+                                        callback_data=ccd(cdh,week_strings[3]))],
                 [InlineKeyboardButton(f"{weekdays_aux[4]} {day_string[4]}",
-                                        callback_data=week_strings[4]),
+                                        callback_data=ccd(cdh,week_strings[4])),
                  InlineKeyboardButton(f"{weekdays_aux[5]} {day_string[5]}",
-                                        callback_data=week_strings[5]),
+                                        callback_data=ccd(cdh,week_strings[5])),
                  InlineKeyboardButton(f"{weekdays_aux[6]} {day_string[6]}",
-                                        callback_data=week_strings[6])]]
+                                        callback_data=ccd(cdh,week_strings[6]))]]
     if ikbs_list:
         keyboard += ikbs_list
     return InlineKeyboardMarkup(keyboard)
@@ -115,7 +119,7 @@ def trip_ids_keyboard(key_list, ikbs_list=None):
 def trips_keyboard(trips_dict, command, ikbs_list=None, show_extra_param=True,
                                                     show_passengers=True):
     """Creates an inline keyboard with formatted trips data which return
-    callback datas with format "<command>_ID;<abbr_dir>;<date>;<key>" for each trip button.
+    callback datas with format "<command>;ID;<abbr_dir>;<date>;<key>" for each trip button.
 
     Parameters
     ----------
@@ -135,7 +139,7 @@ def trips_keyboard(trips_dict, command, ikbs_list=None, show_extra_param=True,
         The keyboard whose callback datas have the explained format.
 
     """
-    cbd = f"{command}_ID"
+    cbd = ccd(command,'ID')
     keyboard = []
     for date in trips_dict:
         for key in trips_dict[date]:
@@ -156,7 +160,7 @@ def trips_keyboard(trips_dict, command, ikbs_list=None, show_extra_param=True,
         keyboard += ikbs_list
     return InlineKeyboardMarkup(keyboard)
 
-def passengers_keyboard(chat_id_list, ikbs_list=None):
+def passengers_keyboard(chat_id_list, cdh, ikbs_list=None):
     """Creates an inline keyboard with the passengers' names as buttons,
     returning their respective chat IDs.
 
@@ -164,6 +168,9 @@ def passengers_keyboard(chat_id_list, ikbs_list=None):
     ----------
     chat_id_list : List[int or strings]
         List with the passengers' chat IDs.
+    cdh : string
+        Callback Data Header: Word to add at the beginning of each of the
+        callback datas for better identification.
     ikbs_list : List[List[telegram.InlineKeyboardButton]]
         If not None, the buttons in this list will be added at the bottom of
         the inline keyboard.
@@ -178,7 +185,7 @@ def passengers_keyboard(chat_id_list, ikbs_list=None):
     n_cols = 2
     n_rows = math.ceil(n_passengers/n_cols)
     index = 0
-    cbd = 'PASS_ID'
+    cbd = ccd(cdh,'PASS_ID')
     keyboard = []
     for i in range(n_rows):
         row = []

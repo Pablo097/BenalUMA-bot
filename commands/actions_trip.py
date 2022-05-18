@@ -14,9 +14,10 @@ from utils.decorators import registered, driver
 # 'New trip' conversation points
 (TRIP_START, TRIP_DATE, TRIP_HOUR, TRIP_SELECT_MORE,
                 TRIP_CHANGING_SLOTS, TRIP_CHANGING_PRICE) = range(6)
+cdh = "NT"   # Callback Data Header
 
 # Abort/Cancel buttons
-ikbs_abort_trip = [[InlineKeyboardButton("Abortar", callback_data="TRIP_ABORT")]]
+ikbs_abort_trip = [[InlineKeyboardButton("Abortar", callback_data=ccd(cdh,'ABORT'))]]
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,9 @@ def new_trip(update, context):
         if key.startswith('trip_'):
             del context.user_data[key]
 
-    keyboard = [[InlineKeyboardButton("Hacia la UMA", callback_data="DIR_UMA"),
-                 InlineKeyboardButton("Hacia Benalmádena", callback_data="DIR_BEN")]]
+    opt = "DIR"
+    keyboard = [[InlineKeyboardButton("Hacia la UMA", callback_data=ccd(cdh,opt,'UMA')),
+                 InlineKeyboardButton("Hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
     keyboard += ikbs_abort_trip
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -47,9 +49,13 @@ def select_date(update, context):
     query = update.callback_query
     query.answer()
 
-    if query.data == "DIR_UMA":
+    data = scd(query.data)
+    if not (data[0]==cdh and data[1]=='DIR'):
+        raise SyntaxError('This callback data does not belong to the select_date function.')
+        
+    if data[2] == "UMA":
         context.user_data['trip_dir'] = 'toUMA'
-    elif query.data == "DIR_BEN":
+    elif data[2] == "BEN":
         context.user_data['trip_dir'] = 'toBenalmadena'
     else:
         logger.warning("Error in trip direction argument.")
@@ -57,7 +63,7 @@ def select_date(update, context):
         query.edit_message_text(text=text, reply_markup=None)
         return ConversationHandler.END
 
-    reply_markup = weekdays_keyboard(ikbs_list=ikbs_abort_trip)
+    reply_markup = weekdays_keyboard(cdh, ikbs_list=ikbs_abort_trip)
     text = f"De acuerdo. ¿Para qué día vas a ofertar el viaje?"
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
@@ -67,7 +73,11 @@ def select_hour(update, context):
     query = update.callback_query
     query.answer()
 
-    context.user_data['trip_date'] = query.data
+    data = scd(query.data)
+    if data[0]!=cdh:
+        raise SyntaxError('This callback data does not belong to the select_hour function.')
+
+    context.user_data['trip_date'] = data[1]
     text = f"Ahora dime, ¿a qué hora pretendes salir desde "\
            f"{'Benalmádena' if context.user_data['trip_dir']=='toUMA' else 'la UMA'}?"\
            f"\n(También puedes mandarme un mensaje con la hora directamente)"
@@ -83,9 +93,9 @@ def send_select_more_message(update, context):
     slots = context.user_data['trip_slots'] if 'trip_slots' in context.user_data else None
     price = context.user_data['trip_price'] if 'trip_price' in context.user_data else None
 
-    keyboard = [[InlineKeyboardButton("Configurar asientos", callback_data="TRIP_SLOTS")],
-                [InlineKeyboardButton("Configurar precio", callback_data="TRIP_PRICE")],
-                [InlineKeyboardButton("Terminar", callback_data="TRIP_DONE")]]
+    keyboard = [[InlineKeyboardButton("Configurar asientos", callback_data=ccd(cdh,"SLOTS"))],
+                [InlineKeyboardButton("Configurar precio", callback_data=ccd(cdh,"PRICE"))],
+                [InlineKeyboardButton("Terminar", callback_data=ccd(cdh,"DONE"))]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"Tu viaje se publicará con los siguientes datos:\n\n"
@@ -116,28 +126,32 @@ def selecting_more(update, context):
     query = update.callback_query
     query.answer()
 
-    if query.data == 'TRIP_SLOTS':
+    data = scd(query.data)
+    if data[0]!=cdh:
+        raise SyntaxError('This callback data does not belong to the selecting_more function.')
+
+    if data[1] == 'SLOTS':
         slots_default = get_slots(update.effective_chat.id)
 
         text_default = f"Usar asientos por defecto ({emoji_numbers[slots_default]})"
         keyboard = [[
-                 InlineKeyboardButton(emoji_numbers[1], callback_data="1"),
-                 InlineKeyboardButton(emoji_numbers[2], callback_data="2"),
-                 InlineKeyboardButton(emoji_numbers[3], callback_data="3")],
-                [InlineKeyboardButton(emoji_numbers[4], callback_data="4"),
-                 InlineKeyboardButton(emoji_numbers[5], callback_data="5"),
-                 InlineKeyboardButton(emoji_numbers[6], callback_data="6")],
-                [InlineKeyboardButton(text_default, callback_data="TRIP_SLOTS_DEFAULT")]]
+                 InlineKeyboardButton(emoji_numbers[1], callback_data=ccd(cdh,"1")),
+                 InlineKeyboardButton(emoji_numbers[2], callback_data=ccd(cdh,"2")),
+                 InlineKeyboardButton(emoji_numbers[3], callback_data=ccd(cdh,"3"))],
+                [InlineKeyboardButton(emoji_numbers[4], callback_data=ccd(cdh,"4")),
+                 InlineKeyboardButton(emoji_numbers[5], callback_data=ccd(cdh,"5")),
+                 InlineKeyboardButton(emoji_numbers[6], callback_data=ccd(cdh,"6"))],
+                [InlineKeyboardButton(text_default, callback_data=ccd(cdh,'SLOTS_DEFAULT'))]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         text = "¿Cuántos asientos disponibles quieres ofertar para este viaje?"
         context.user_data['trip_setting'] = 'slots'
         next_state = TRIP_CHANGING_SLOTS
-    elif query.data == 'TRIP_PRICE':
+    elif data[1] == 'PRICE':
         price_default = str(get_fee(update.effective_chat.id)).replace('.',',')
 
         text_default = f"Usar precio por defecto ({price_default}€)"
-        keyboard = [[InlineKeyboardButton(text_default, callback_data="TRIP_PRICE_DEFAULT")]]
+        keyboard = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'PRICE_DEFAULT'))]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         text = "Escribe el precio por pasajero para este trayecto (máximo 1,5€)."
@@ -155,12 +169,16 @@ def update_trip_setting(update, context):
     else:
         is_query = False
 
+    data = scd(query.data)
+    if data[0]!=cdh:
+        raise SyntaxError('This callback data does not belong to the update_trip_setting function.')
+
     setting = context.user_data.pop('trip_setting', None)
     if setting == 'slots':
-        if query.data == "TRIP_SLOTS_DEFAULT":
+        if data[1] == "SLOTS_DEFAULT":
             context.user_data.pop('trip_slots', None)
         else:
-            context.user_data['trip_slots'] = int(query.data)
+            context.user_data['trip_slots'] = int(data[1])
     elif setting == 'price':
         if not is_query:
             # Remove possible inline keyboard from previous message
@@ -176,7 +194,7 @@ def update_trip_setting(update, context):
                 price_default = str(get_fee(update.effective_chat.id)).replace('.',',')
 
                 text_default = f"Usar precio por defecto ({price_default}€)"
-                keyboard = [[InlineKeyboardButton(text_default, callback_data="TRIP_PRICE_DEFAULT")]]
+                keyboard = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'PRICE_DEFAULT'))]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
                 text = f"Por favor, introduce un número entre 0 y {str(MAX_FEE).replace('.',',')}."
@@ -186,7 +204,7 @@ def update_trip_setting(update, context):
                 return TRIP_CHANGING_PRICE
             else:
                 context.user_data['trip_price'] = price
-        elif query.data == "TRIP_PRICE_DEFAULT":
+        elif data[1] == "PRICE_DEFAULT":
             context.user_data.pop('trip_price', None)
 
     send_select_more_message(update, context)
@@ -225,36 +243,36 @@ def trip_abort(update, context):
     return ConversationHandler.END
 
 def add_handlers(dispatcher):
-    regex_iso_date = '^([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])$'
+    regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'
 
     # Create conversation handler for 'new trip'
     trip_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('nuevoviaje', new_trip)],
         states={
             TRIP_START: [
-                CallbackQueryHandler(select_date, pattern='^(DIR_UMA|DIR_BEN)$'),
+                CallbackQueryHandler(select_date, pattern=f"^{ccd(cdh,'DIR','(UMA|BEN)')}$"),
             ],
             TRIP_DATE: [
-                CallbackQueryHandler(select_hour, pattern=regex_iso_date),
+                CallbackQueryHandler(select_hour, pattern=f"^{ccd(cdh,regex_iso_date)}$"),
             ],
             TRIP_HOUR: [
                 CallbackQueryHandler(select_more, pattern='^TIME_PICKER.*'),
                 MessageHandler(Filters.text & ~Filters.command, select_more),
             ],
             TRIP_SELECT_MORE: [
-                CallbackQueryHandler(selecting_more, pattern='^(TRIP_SLOTS|TRIP_PRICE)$'),
-                CallbackQueryHandler(publish_trip, pattern='^TRIP_DONE$'),
+                CallbackQueryHandler(selecting_more, pattern=f"^{ccd(cdh,'(SLOTS|PRICE)')}$"),
+                CallbackQueryHandler(publish_trip, pattern=f"^{ccd(cdh,'DONE')}$"),
             ],
             TRIP_CHANGING_SLOTS: [
-                CallbackQueryHandler(update_trip_setting, pattern='^(1|2|3|4|5|6)$'),
-                CallbackQueryHandler(update_trip_setting, pattern='^TRIP_SLOTS_DEFAULT$'),
+                CallbackQueryHandler(update_trip_setting, pattern=f"^{ccd(cdh,'(1|2|3|4|5|6)')}$"),
+                CallbackQueryHandler(update_trip_setting, pattern=f"^{ccd(cdh,'SLOTS_DEFAULT')}$"),
             ],
             TRIP_CHANGING_PRICE: [
-                CallbackQueryHandler(update_trip_setting, pattern='^TRIP_PRICE_DEFAULT$'),
+                CallbackQueryHandler(update_trip_setting, pattern=f"^{ccd(cdh,'PRICE_DEFAULT')}$"),
                 MessageHandler(Filters.text & ~Filters.command, update_trip_setting),
             ]
         },
-        fallbacks=[CallbackQueryHandler(trip_abort, pattern='^TRIP_ABORT$'),
+        fallbacks=[CallbackQueryHandler(trip_abort, pattern=f"^{ccd(cdh,'ABORT')}$"),
                    CommandHandler('nuevoviaje', new_trip)],
     )
 
