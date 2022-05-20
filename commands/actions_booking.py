@@ -332,6 +332,7 @@ def alert_user(update, context):
         send_message(context, user_id, text_booker, telegram.ParseMode.MARKDOWN_V2,
                             notify_id = driver_id)
         if reservation_ok:
+            text_booker2 = "TODO"
             # TODO: Check if passenger had any trip requests near this trip,
             # delete it and notify the deletion to passenger
 
