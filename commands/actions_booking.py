@@ -331,6 +331,9 @@ def alert_user(update, context):
                                         is_abbreviated = not reservation_ok)
         send_message(context, user_id, text_booker, telegram.ParseMode.MARKDOWN_V2,
                             notify_id = driver_id)
+        if reservation_ok:
+            # TODO: Check if passenger had any trip requests near this trip,
+            # delete it and notify the deletion to passenger
 
 def add_handlers(dispatcher):
     regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'

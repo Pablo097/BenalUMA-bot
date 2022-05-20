@@ -6,8 +6,10 @@ from data.database_api import (is_driver, delete_user, delete_driver,
                                 get_trips_by_driver, get_trip_passengers,
                                 get_trip_time, delete_trip, remove_passenger,
                                 get_slots, get_fee,
-                                get_users_for_offer_notification)
-from messages.format import (get_formatted_trip_for_passenger, format_trip_from_data)
+                                get_users_for_offer_notification,
+                                get_users_for_request_notification)
+from messages.format import (get_formatted_trip_for_passenger,
+                            format_trip_from_data, format_request_from_data)
 from messages.message_queue import send_message
 from utils.common import *
 
@@ -19,7 +21,7 @@ def notify_new_trip(context, direction, chat_id, date, time, slots=None, fee=Non
     if not fee:
         fee = get_fee(chat_id)
 
-    text = "🔵 Se ha publicado un nuevo viaje:\n\n"
+    text = "🔵 Se ha publicado un *nuevo viaje*:\n\n"
     text += format_trip_from_data(direction, date, chat_id, time, slots, fee=fee)
     text += f"\n\nSi te interesa reservar un asiento, puedes hacerlo a través"\
             f" del comando /verofertas\."
@@ -27,6 +29,28 @@ def notify_new_trip(context, direction, chat_id, date, time, slots=None, fee=Non
     # Obtain list of interested users for this trip
     weekday = weekdays[datetime.fromisoformat(date).weekday()]
     user_ids = get_users_for_offer_notification(direction, weekday, time)
+
+    # Make sure that the driver doesn't get notified
+    user_ids = list(set(user_ids)-set([str(chat_id)]))
+
+    send_message(context, user_ids, text, telegram.ParseMode.MARKDOWN_V2)
+
+def notify_new_request(context, direction, chat_id, date, time):
+    text = "🔴 Se ha publicado una *nueva petición* de viaje:\n\n"
+    text += format_request_from_data(direction, date, chat_id, time)
+    text2 = f"\n\nSi estás interesado en publicar una oferta para satisfacer"\
+            f" esta petición, puedes hacerlo a través del comando /nuevoviaje."\
+            f"\nTambién puedes escribirle directamente al solicitante pulsando"\
+            f" en su nombre (pero si no publicas el viaje, nadie más se"\
+            f" enterará de que lo vas a hacer)."
+    text += escape_markdown(text2, 2)
+
+    # Obtain list of interested drivers for this request
+    weekday = weekdays[datetime.fromisoformat(date).weekday()]
+    user_ids = get_users_for_request_notification(direction, weekday)
+
+    # Make sure that the requester doesn't get notified
+    user_ids = list(set(user_ids)-set([str(chat_id)]))
 
     send_message(context, user_ids, text, telegram.ParseMode.MARKDOWN_V2)
 

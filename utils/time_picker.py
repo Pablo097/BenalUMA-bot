@@ -132,9 +132,13 @@ def process_time_callback(update, context, command, ikbs):
             return
 
     # Check time validity depending on command
-    if command == 'trip' and not is_future_datetime(context.user_data[f"{command}_date"], time):
-        text = f"¡No puedes crear un nuevo viaje en el pasado!"\
-               f"\nPor favor, introduce una hora válida."
+    if ((command=='trip' or command=='request') and
+            not is_future_datetime(context.user_data[f"{command}_date"], time)):
+        if command=='trip':
+            text = f"¡No puedes crear un nuevo viaje en el pasado!"
+        elif command=='request':
+            text = f"¡No puedes pedir un viaje en el pasado!"
+        text += f"\nPor favor, introduce una hora válida."
         hour, minutes = time.split(':')
         if not is_query:
             minutes = 0

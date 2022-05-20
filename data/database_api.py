@@ -91,15 +91,18 @@ def delete_user(chat_id):
     None
 
     """
-
-    db.reference(f"/Users/{str(chat_id)}").delete()
-    if is_driver(chat_id):
-        delete_driver(chat_id)
-    # Delete also possible offers notifications configuration
+    # Delete possible offers notifications configuration
     notif_dict = get_offer_notification_by_user(chat_id)
     if notif_dict:
         for dir in notif_dict:
             delete_offer_notification(chat_id, dir)
+    # Delete published requests
+    delete_all_requests_by_user(chat_id)
+    # Delete possible driver-related things
+    if is_driver(chat_id):
+        delete_driver(chat_id)
+    # Finally, completely delete user
+    db.reference(f"/Users/{str(chat_id)}").delete()
 
 # Drivers
 
@@ -156,14 +159,15 @@ def delete_driver(chat_id):
     None
 
     """
-
-    delete_all_trips_by_driver(chat_id)
-    db.reference(f"/Drivers/{str(chat_id)}").delete()
-    # Delete also possible request notifications configuration
+    # Delete possible request notifications configuration
     notif_dict = get_request_notification_by_user(chat_id)
     if notif_dict:
         for dir in notif_dict:
             delete_request_notification(chat_id, dir)
+    # Delete published trips
+    delete_all_trips_by_driver(chat_id)
+    # Finally, delete driver
+    db.reference(f"/Drivers/{str(chat_id)}").delete()
 
 def get_slots(chat_id):
     """Gets the number of slots of a driver.
@@ -787,6 +791,211 @@ def remove_passenger(chat_id, direction, date, key):
 
     return True
 
+
+# Requests
+
+def add_request(direction, chat_id, date, time):
+    """Creates new request with given information.
+
+    Parameters
+    ----------
+    direction : string
+        Required direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    chat_id : int or string
+        The chat_id of the requester.
+    date : string
+        Required departure date with ISO format 'YYYY-mm-dd'
+    time : string
+        Desired departure time with ISO format 'HH:MM'
+
+    Returns
+    -------
+    string
+        Key of the newly created DB reference.
+
+    """
+    ref = db.reference(f"/Requests/{direction}/{date}")
+
+    req_dict = {'Chat ID': chat_id,
+                 'Time': time}
+
+    key = ref.push(req_dict).key
+
+    # Now add the key to the user's requests section
+    ref = db.reference(f"/Users/{chat_id}/Requests/{direction}/{date}/{key}")
+    ref.set(True)
+
+    return key
+
+def delete_request(direction, date, key):
+    """Deletes a request.
+
+    Parameters
+    ----------
+    direction : string
+        Required direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Required departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the request.
+
+    Returns
+    -------
+    None
+
+    """
+    chat_id = get_request_chat_id(direction, date, key)
+    db.reference(f"/Requests/{direction}/{date}/{key}").delete()
+    db.reference(f"/Users/{chat_id}/Requests/{direction}/{date}/{key}").delete()
+
+def get_request(direction, date, key):
+    """Gets a dictionary with the given request info.
+
+    Parameters
+    ----------
+    direction : string
+        Required direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Required departure date with ISO format 'YYYY-mm-dd'.
+    key : string
+        Unique key identifying the request.
+
+    Returns
+    -------
+    dict
+        Request information.
+
+    """
+    ref = db.reference(f"/Requests/{direction}/{date}/{key}")
+    return ref.get()
+
+def get_request_chat_id(direction, date, key):
+    ref = db.reference(f"/Requests/{direction}/{date}/{key}")
+    return ref.child('Chat ID').get()
+
+def get_requests_by_date_range(direction, date, time_start=None, time_end=None):
+    """Gets a dictionary with the trip requests for a given date and,
+    optionally, time range
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    time_start : string
+        Sooner departure time to search for, with ISO format 'HH:MM'.
+    time_end : string
+        Latest departure time to search for, with ISO format 'HH:MM'.
+
+    Returns
+    -------
+    dict
+        Dictionary with found requests. It has the following format:
+        {'request_unique_key_1': <dict with request info 1>,
+         'request_unique_key_2': <dict with request info 2>,
+         ...}
+
+    """
+    ref = db.reference(f"/Requests/{direction}/{date}/")
+    query = ref.order_by_child("Time")
+
+    if time_start:
+        query = query.start_at(time_start)
+    if time_end:
+        query = query.end_at(time_end)
+
+    return query.get()
+
+def get_requests_by_user(chat_id, date_start=None, date_end=None, order_by_date=False):
+    """Return a dictionary with all the trip requests for a given user
+    between the given dates.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user.
+    date_start : string
+        Range's start date with ISO format 'YYYY-mm-dd'. Optional
+    date_end : string
+        Range's stop date with ISO format 'YYYY-mm-dd'. Optional
+    order_by_date : boolean
+        Flag which indicates whether to order the requests by date instead of by
+        direction. If True, each trip contains a 'Direction' field. False by default.
+
+    Returns
+    -------
+    dict
+        Dictionary with the planned trips.
+
+    """
+    ref = db.reference(f"/Drivers/{chat_id}/Offers")
+    trips_dict = dict()
+
+    for dir in ['toBenalmadena', 'toUMA']:
+        query = ref.child(dir).order_by_key()
+        if date_start:
+            query = query.start_at(date_start)
+        if date_end:
+            query = query.end_at(date_end)
+
+        trip_keys_dict = query.get()
+        if trip_keys_dict:
+            dir_trips = dict()
+            for date in trip_keys_dict:
+                date_trips = dict()
+                for key in trip_keys_dict[date]:
+                    date_trips[key] = get_trip(dir, date, key)
+                if date_trips:
+                    dir_trips[date] = OrderedDict(
+                            sorted(date_trips.items(), key=lambda x: x[1]['Time']))
+            if dir_trips:
+                trips_dict[dir] = dir_trips
+
+    if trips_dict:
+        if order_by_date:
+            trips_dict_by_date = dict()
+            dates = set()
+            # First narrow down the dates to process
+            for dir in trips_dict:
+                dates = dates.union(set(trips_dict[dir]))
+            # We want to present the trips by date
+            for date in sorted(dates):
+                date_trips = dict()
+                for dir in trips_dict:
+                    if date in trips_dict[dir]:
+                        # Save the direction of each trip in an specific field
+                        for key in trips_dict[dir][date]:
+                            trips_dict[dir][date][key]['Direction'] = dir
+                        date_trips.update(trips_dict[dir][date])
+                # Order dict by time if it exists
+                if date_trips:
+                    trips_dict_by_date[date] = OrderedDict(
+                            sorted(date_trips.items(), key=lambda x: x[1]['Time']))
+            return trips_dict_by_date
+        return trips_dict
+    return
+
+def delete_all_requests_by_user(chat_id):
+    """Deletes all the trip requests for a given user.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user.
+
+    Returns
+    -------
+    None
+
+    """
+    ref = db.reference(f"/Users/{chat_id}/Requests")
+    reqs_dict = ref.get()
+    if reqs_dict:
+        for dir in reqs_dict:
+            for date in reqs_dict[dir]:
+                for req_key in reqs_dict[dir][date]:
+                    delete_request(dir, date, req_key)
 
 # Notifications
 

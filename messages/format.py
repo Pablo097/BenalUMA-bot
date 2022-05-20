@@ -5,7 +5,8 @@ from data.database_api import (get_name, is_driver, get_slots, get_car,
                                get_trips_by_date_range, get_trips_by_driver,
                                get_trips_by_passenger,
                                get_offer_notification_by_user,
-                               get_request_notification_by_user)
+                               get_request_notification_by_user,
+                               get_request)
 from telegram.utils.helpers import escape_markdown
 from utils.common import *
 
@@ -262,6 +263,142 @@ def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None
         string = "No existen viajes ofertados en las fechas seleccionadas\."
 
     return string, key_list
+
+def get_formatted_trips_near_request(direction, date, time):
+    """Generates a formatted string with the offered trips around the time
+    of the request being published.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the request. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    time : string
+        Request's required time with ISO format 'HH:MM'.
+
+    Returns
+    -------
+    string
+        Formatted string in Telegram's Markdown v2.
+
+    """
+    hour = int(time[:2])
+    time_before = f"{(hour-1):02}:{time[-2:]}" if hour>0 else "00:00"
+    time_after = f"{(hour+1):02}:{time[-2:]}" if hour<23 else "23:59"
+    trips_dict = get_trips_by_date_range(direction, date, time_before, time_after)
+
+    string_list = []
+    # key_list = []
+    if trips_dict:
+        for key in trips_dict:
+            if 'Slots' in trips_dict[key]:
+                slots = trips_dict[key]['Slots']
+            else:
+                slots = get_slots(trips_dict[key]['Chat ID'])
+            # Check if there are available seats yet
+            if 'Passengers' in trips_dict[key]:
+                slots -= len(trips_dict[key]['Passengers'])
+
+            if slots > 0: # If trip is full, it is not shown
+                if 'Fee' in trips_dict[key]:
+                    fee = trips_dict[key]['Fee']
+                else:
+                    fee = get_fee(trips_dict[key]['Chat ID'])
+
+                string_list.append(format_trip_from_data(chat_id=trips_dict[key]['Chat ID'],
+                                                time=trips_dict[key]['Time'],
+                                                slots=slots, fee=fee))
+                # key_list.append(key)
+
+    if string_list:
+        string = '\n\n'.join(string_list)
+    else:
+        string = ''
+
+    return string #, key_list
+
+def format_request_from_data(direction=None, date=None, chat_id=None, time=None,
+                            is_abbreviated=False):
+    """Generates formatted string with the given request data.
+    All the parameters are optional.
+    This function formats the data as it is passed.
+    Only the users' names are obtained from their chat IDs.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    chat_id : int
+        Telegram Chat ID of the requester.
+    time : string
+        Departure time with ISO format 'HH:MM'.
+    is_abbreviated : boolean
+        Flag to indicate whether to abbreviate the message, only using
+        the emojis and writting all in one line, without Markdown.
+
+    Returns
+    -------
+    string
+        Formatted string in Telegram's Markdown v2.
+
+    """
+    fields = []
+
+    if not is_abbreviated:
+        if chat_id:
+            fields.append(f"🧑 *Solicitante*: {get_markdown2_inline_mention(chat_id)}")
+        if direction:
+            fields.append(f"📍 *Dirección*: `{direction[2:]}`")
+        if date:
+            weekday = weekdays[datetime.fromisoformat(date).weekday()]
+            fields.append(f"📅 *Fecha*: `{weekday} {date[8:10]}/{date[5:7]}`")
+        if time:
+            fields.append(f"🕖 *Hora*: `{time}`")
+        string = '\n'.join(fields)
+    else:
+        if chat_id:
+            fields.append(f"🧑 {get_name(chat_id)}")
+        if direction:
+            fields.append(f"📍 {direction[2:]}")
+        if date:
+            weekday = weekdays[datetime.fromisoformat(date).weekday()]
+            fields.append(f"📅 {weekday} {date[8:10]}")
+        if time:
+            fields.append(f"🕖 {time}")
+        string = '  '.join(fields)
+
+    return string
+
+def get_formatted_request(direction, date, key, is_abbreviated=False):
+    """Generates a formatted string with the request information.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'
+    key : type
+        Unique key of the request in the DB.
+    is_abbreviated : boolean
+        Flag to indicate whether to abbreviate the message, only using
+        the emojis and writting all in one line, without Markdown.
+
+    Returns
+    -------
+    string
+        Formatted string with request's info in Telegram's Markdown v2.
+
+    """
+    req_dict = get_request(direction, date, key)
+
+    time = req_dict['Time']
+    user_id = req_dict['Chat ID']
+
+    return format_request_from_data(direction, date, user_id, time)
 
 def get_driver_week_formatted_trips(chat_id):
     """Generates a formatted string with the offered trips for the next

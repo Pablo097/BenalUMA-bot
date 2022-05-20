@@ -33,8 +33,8 @@ def help(update, context):
                 text += f"\n📆 /misviajes - Muestra los viajes que tienes ofertados"\
                         f" para esta semana."
             text += f"\n🎟️ /misreservas - Muestra tus viajes reservados esta semana."
-            # text += f"\n📕 /nuevapeticion - Inicia el asistente para crear una nueva"\
-            #         f" petición de viaje."
+            text += f"\n📕 /nuevapeticion - Inicia el asistente para crear una nueva"\
+                    f" petición de viaje."
             text += f"\n🔔 /notificaciones - Permite configurar tus notificaciones "\
                     f"sobre nuevos viajes y peticiones."
         else:
