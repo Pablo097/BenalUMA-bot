@@ -140,7 +140,8 @@ def publish_request(update, context):
     text = escape_markdown("Perfecto. ¡Tu petición de viaje se ha publicado!\n\n",2)
     text += get_formatted_request(dir, date, request_key)
     text2 = f"\n\nTu petición se eliminará cuando reserves un asiento en un viaje"\
-            f" que salga entre una hora antes y una después de la que has pedido."\
+            f" que salga entre una hora antes y una después de la que has pedido"\
+            f" (te notificaré si se publica algún viaje con esas características)."\
             f" Siempre puedes eliminar manualmente tu petición con el comando"\
             f" /mispeticiones en caso de que ya no la necesites."
     text += escape_markdown(text2, 2)

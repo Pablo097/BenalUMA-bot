@@ -921,16 +921,16 @@ def get_requests_by_user(chat_id, date_start=None, date_end=None, order_by_date=
         Range's stop date with ISO format 'YYYY-mm-dd'. Optional
     order_by_date : boolean
         Flag which indicates whether to order the requests by date instead of by
-        direction. If True, each trip contains a 'Direction' field. False by default.
+        direction. If True, each request contains a 'Direction' field. False by default.
 
     Returns
     -------
     dict
-        Dictionary with the planned trips.
+        Dictionary with the trip requests.
 
     """
-    ref = db.reference(f"/Drivers/{chat_id}/Offers")
-    trips_dict = dict()
+    ref = db.reference(f"/Users/{chat_id}/Requests")
+    reqs_dict = dict()
 
     for dir in ['toBenalmadena', 'toUMA']:
         query = ref.child(dir).order_by_key()
@@ -939,41 +939,81 @@ def get_requests_by_user(chat_id, date_start=None, date_end=None, order_by_date=
         if date_end:
             query = query.end_at(date_end)
 
-        trip_keys_dict = query.get()
-        if trip_keys_dict:
-            dir_trips = dict()
-            for date in trip_keys_dict:
-                date_trips = dict()
-                for key in trip_keys_dict[date]:
-                    date_trips[key] = get_trip(dir, date, key)
-                if date_trips:
-                    dir_trips[date] = OrderedDict(
-                            sorted(date_trips.items(), key=lambda x: x[1]['Time']))
-            if dir_trips:
-                trips_dict[dir] = dir_trips
+        reqs_keys_dict = query.get()
+        if reqs_keys_dict:
+            dir_reqs = dict()
+            for date in reqs_keys_dict:
+                date_reqs = dict()
+                for key in reqs_keys_dict[date]:
+                    date_reqs[key] = get_request(dir, date, key)
+                if date_reqs:
+                    dir_reqs[date] = OrderedDict(
+                            sorted(date_reqs.items(), key=lambda x: x[1]['Time']))
+            if dir_reqs:
+                reqs_dict[dir] = dir_reqs
 
-    if trips_dict:
+    if reqs_dict:
         if order_by_date:
-            trips_dict_by_date = dict()
+            reqs_dict_by_date = dict()
             dates = set()
             # First narrow down the dates to process
-            for dir in trips_dict:
-                dates = dates.union(set(trips_dict[dir]))
-            # We want to present the trips by date
+            for dir in reqs_dict:
+                dates = dates.union(set(reqs_dict[dir]))
+            # We want to present the requests by date
             for date in sorted(dates):
-                date_trips = dict()
-                for dir in trips_dict:
-                    if date in trips_dict[dir]:
-                        # Save the direction of each trip in an specific field
-                        for key in trips_dict[dir][date]:
-                            trips_dict[dir][date][key]['Direction'] = dir
-                        date_trips.update(trips_dict[dir][date])
+                date_reqs = dict()
+                for dir in reqs_dict:
+                    if date in reqs_dict[dir]:
+                        # Save the direction of each request in an specific field
+                        for key in reqs_dict[dir][date]:
+                            reqs_dict[dir][date][key]['Direction'] = dir
+                        date_reqs.update(reqs_dict[dir][date])
                 # Order dict by time if it exists
-                if date_trips:
-                    trips_dict_by_date[date] = OrderedDict(
-                            sorted(date_trips.items(), key=lambda x: x[1]['Time']))
-            return trips_dict_by_date
-        return trips_dict
+                if date_reqs:
+                    reqs_dict_by_date[date] = OrderedDict(
+                            sorted(date_reqs.items(), key=lambda x: x[1]['Time']))
+            return reqs_dict_by_date
+        return reqs_dict
+    return
+
+def get_requests_by_user_and_date(chat_id, direction, date, time_start=None, time_end=None):
+    """Return a dictionary with all the trip requests for a given user in the
+    specified direction and date.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user.
+    direction : string
+        Required direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Required departure date with ISO format 'YYYY-mm-dd'.
+    time_start : string
+        Sooner departure time to search for, with ISO format 'HH:MM'.
+    time_end : string
+        Latest departure time to search for, with ISO format 'HH:MM'.
+
+    Returns
+    -------
+    dict
+        Dictionary with the trip requests.
+
+    """
+    ref = db.reference(f"/Users/{chat_id}/Requests/{direction}/{date}")
+
+    reqs_dict = dict()
+    reqs_keys_dict = ref.get()
+
+    if reqs_keys_dict:
+        for key in reqs_keys_dict:
+            req_aux = get_request(direction, date, key)
+            if time_end>=req_aux['Time']>=time_start:
+                reqs_dict[key] = req_aux
+
+    if reqs_dict:
+        reqs_dict = OrderedDict(
+                sorted(reqs_dict.items(), key=lambda x: x[1]['Time']))
+        return reqs_dict
     return
 
 def delete_all_requests_by_user(chat_id):

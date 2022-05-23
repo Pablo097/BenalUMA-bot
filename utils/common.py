@@ -174,3 +174,39 @@ def is_future_datetime(date, time, minutes_margin=0):
 
 def is_greater_isotime(time1, time2):
     return time.fromisoformat(time1) > time.fromisoformat(time2)
+
+def get_time_range_from_center_time(central_time, hour_delta, minutes_delta=0):
+    """Returns the initial and end times from a central time, adding and
+    substracting the time delta from it.
+
+    Parameters
+    ----------
+    central_time : string
+        Central time for the time range, with ISO format 'HH:MM'.
+    hour_delta : int
+        Hours to add and substract to the central time.
+    minutes_delta : int
+        Minutes to add and substract to the central time.
+
+    Returns
+    -------
+    (string, string)
+        Start and end times in ISO format 'HH:MM'
+
+    """
+    ctime = time.fromisoformat(central_time)
+    dtime = timedelta(hours=hour_delta, minutes=minutes_delta)
+
+    time_start = (datetime.combine(date.today(), ctime) - dtime).time()
+    if time_start>ctime:
+        time_start = time()
+
+    time_end = (datetime.combine(date.today(), ctime) + dtime).time()
+    if time_end<ctime:
+        time_end = time(hour=23,minute=59)
+
+    # hour = int(time[:2])
+    # time_before = f"{(hour-1):02}:{time[-2:]}" if hour>0 else "00:00"
+    # time_after = f"{(hour+1):02}:{time[-2:]}" if hour<23 else "23:59"
+
+    return (time_start.isoformat('minutes'), time_end.isoformat('minutes'))

@@ -5,11 +5,13 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
 from telegram.utils.helpers import escape_markdown
 from data.database_api import (get_name, get_slots, get_trip, get_trip_chat_id,
                                 get_number_of_passengers, get_trip_slots,
-                                add_passenger, is_passenger, get_trip_time)
+                                add_passenger, is_passenger, get_trip_time,
+                                get_requests_by_user_and_date, delete_request)
 from messages.format import (get_markdown2_inline_mention,
                           get_formatted_trip_for_passenger,
                           get_formatted_trip_for_driver,
-                          get_formatted_offered_trips)
+                          get_formatted_offered_trips,
+                          format_request_from_data)
 from messages.message_queue import send_message
 from utils.keyboards import (weekdays_keyboard, trip_ids_keyboard)
 from utils.time_picker import (time_picker_keyboard, process_time_callback)
@@ -287,7 +289,8 @@ def alert_user(update, context):
 
     reservation_ok = False
     # Check that trip still exists
-    if get_trip_time(dir, date, trip_key) == None:
+    time = get_trip_time(dir, date, trip_key)
+    if time == None:
         text = escape_markdown(f"⚠️ Este viaje ya no existe.",2)
         text_booker = ""
     # Check action
@@ -332,9 +335,21 @@ def alert_user(update, context):
         send_message(context, user_id, text_booker, telegram.ParseMode.MARKDOWN_V2,
                             notify_id = driver_id)
         if reservation_ok:
-            text_booker2 = "TODO"
-            # TODO: Check if passenger had any trip requests near this trip,
+            # Check if passenger had any trip requests near this trip,
             # delete it and notify the deletion to passenger
+            time_start, time_end = get_time_range_from_center_time(time, 1)
+            req_dict = get_requests_by_user_and_date(user_id, dir, date,
+                                                    time_start, time_end)
+            if req_dict:
+                for key in req_dict:
+                    delete_request(dir, date, key)
+                    text_booker2 = f"Al haber reservado el viaje, se ha eliminado"\
+                                   f" tu siguiente petición por tener unos"\
+                                   f" requisitos muy similares:\n\n"
+                    text_booker2 += format_request_from_data(dir, date,
+                                                    time=req_dict[key]['Time'])
+                    send_message(context, user_id, text_booker2,
+                                            telegram.ParseMode.MARKDOWN_V2)
 
 def add_handlers(dispatcher):
     regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'

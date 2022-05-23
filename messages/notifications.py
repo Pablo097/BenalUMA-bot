@@ -7,7 +7,8 @@ from data.database_api import (is_driver, delete_user, delete_driver,
                                 get_trip_time, delete_trip, remove_passenger,
                                 get_slots, get_fee,
                                 get_users_for_offer_notification,
-                                get_users_for_request_notification)
+                                get_users_for_request_notification,
+                                get_requests_by_date_range)
 from messages.format import (get_formatted_trip_for_passenger,
                             format_trip_from_data, format_request_from_data)
 from messages.message_queue import send_message
@@ -29,6 +30,13 @@ def notify_new_trip(context, direction, chat_id, date, time, slots=None, fee=Non
     # Obtain list of interested users for this trip
     weekday = weekdays[datetime.fromisoformat(date).weekday()]
     user_ids = get_users_for_offer_notification(direction, weekday, time)
+
+    # Now get the possible users requesting a trip similar to this one
+    time_before, time_after = get_time_range_from_center_time(time, 1)
+    req_dict = get_requests_by_date_range(direction, date, time_before, time_after)
+    if req_dict:
+        req_user_ids = [str(req_dict[key]['Chat ID']) for key in req_dict]
+        user_ids = list(set(user_ids)|set(req_user_ids))
 
     # Make sure that the driver doesn't get notified
     user_ids = list(set(user_ids)-set([str(chat_id)]))

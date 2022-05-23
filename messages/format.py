@@ -283,9 +283,7 @@ def get_formatted_trips_near_request(direction, date, time):
         Formatted string in Telegram's Markdown v2.
 
     """
-    hour = int(time[:2])
-    time_before = f"{(hour-1):02}:{time[-2:]}" if hour>0 else "00:00"
-    time_after = f"{(hour+1):02}:{time[-2:]}" if hour<23 else "23:59"
+    time_before, time_after = get_time_range_from_center_time(time, 1)
     trips_dict = get_trips_by_date_range(direction, date, time_before, time_after)
 
     string_list = []
