@@ -3,7 +3,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
-from data.database_api import add_trip, get_fee, get_slots
+from data.database_api import add_trip, get_fee, get_slots, get_request_time
 from messages.format import format_trip_from_data, get_formatted_trip_for_driver
 from messages.notifications import notify_new_trip
 from utils.keyboards import weekdays_keyboard
@@ -52,7 +52,7 @@ def select_date(update, context):
     data = scd(query.data)
     if not (data[0]==cdh and data[1]=='DIR'):
         raise SyntaxError('This callback data does not belong to the select_date function.')
-        
+
     if data[2] == "UMA":
         context.user_data['trip_dir'] = 'toUMA'
     elif data[2] == "BEN":
@@ -120,6 +120,27 @@ def select_more(update, context):
     else:
         context.user_data['trip_time'] = time
         send_select_more_message(update, context)
+    return TRIP_SELECT_MORE
+
+def select_more_from_SR(update, context):
+    query = update.callback_query
+    query.answer()
+
+    if 'SR_message' in context.user_data:
+        context.user_data['trip_message'] = context.user_data.pop('SR_message')
+    dir = context.user_data.pop('SR_dir')
+    date = context.user_data.pop('SR_date')
+    data = scd(query.data)
+    if data[0] != 'REQ_ID':
+        raise SyntaxError('This callback data does not belong to the select_more_from_SR function.')
+    req_key = ';'.join(data[1:])   # Just in case the unique ID constains a ';'
+
+    time = get_request_time(dir, date, req_key)
+    context.user_data['trip_dir'] = dir
+    context.user_data['trip_date'] = date
+    context.user_data['trip_time'] = time
+    send_select_more_message(update, context)
+
     return TRIP_SELECT_MORE
 
 def selecting_more(update, context):
@@ -225,7 +246,7 @@ def publish_trip(update, context):
     text += get_formatted_trip_for_driver(dir, date, trip_key)
     query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
 
-    notify_new_trip(context, dir, update.effective_chat.id, date, time, slots, price)
+    notify_new_trip(context, trip_key, dir, update.effective_chat.id, date, time, slots, price)
 
     for key in list(context.user_data.keys()):
         if key.startswith('trip_'):
@@ -246,8 +267,10 @@ def add_handlers(dispatcher):
     regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'
 
     # Create conversation handler for 'new trip'
+    global trip_conv_handler
     trip_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('nuevoviaje', new_trip)],
+        entry_points=[CommandHandler('nuevoviaje', new_trip),
+                      CallbackQueryHandler(select_more_from_SR, pattern="^REQ_ID[^\ \n]*")],
         states={
             TRIP_START: [
                 CallbackQueryHandler(select_date, pattern=f"^{ccd(cdh,'DIR','(UMA|BEN)')}$"),
@@ -274,6 +297,11 @@ def add_handlers(dispatcher):
         },
         fallbacks=[CallbackQueryHandler(trip_abort, pattern=f"^{ccd(cdh,'ABORT')}$"),
                    CommandHandler('nuevoviaje', new_trip)],
+        map_to_parent={
+            # Mapping for when this conversation handler is nested inside the
+            # 'see requests' conversation handler
+            ConversationHandler.END: ConversationHandler.END
+        }
     )
 
     dispatcher.add_handler(trip_conv_handler)

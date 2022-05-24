@@ -276,7 +276,6 @@ def notif_end(update, context):
     for key in list(context.user_data.keys()):
         if key.startswith('notif_'):
             del context.user_data[key]
-    # TODO: FIX THIS. This deletes the markdown.
     text = query.message.text
     query.edit_message_text(text[:text.rfind('\n')], entities=query.message.entities)
     return ConversationHandler.END

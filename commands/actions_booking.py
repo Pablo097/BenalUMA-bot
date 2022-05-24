@@ -152,7 +152,7 @@ def SO_visualize(update, context):
                 time_stop = time
 
     if 'SO_message' in context.user_data:
-        context.user_data.pop('SO_message')
+        del context.user_data['SO_message']
     dir = context.user_data['SO_dir']
     date = context.user_data['SO_date']
 
@@ -344,8 +344,8 @@ def alert_user(update, context):
                 for key in req_dict:
                     delete_request(dir, date, key)
                     text_booker2 = f"Al haber reservado el viaje, se ha eliminado"\
-                                   f" tu siguiente petición por tener unos"\
-                                   f" requisitos muy similares:\n\n"
+                                   f" tu siguiente petición con requisitos"\
+                                   f" similares:\n\n"
                     text_booker2 += format_request_from_data(dir, date,
                                                     time=req_dict[key]['Time'])
                     send_message(context, user_id, text_booker2,

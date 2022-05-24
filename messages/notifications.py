@@ -1,4 +1,5 @@
 import logging, telegram, math
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from telegram.utils.helpers import escape_markdown
 from datetime import datetime
@@ -16,7 +17,7 @@ from utils.common import *
 
 logger = logging.getLogger(__name__)
 
-def notify_new_trip(context, direction, chat_id, date, time, slots=None, fee=None):
+def notify_new_trip(context, trip_key, direction, chat_id, date, time, slots=None, fee=None):
     if not slots:
         slots = get_slots(chat_id)
     if not fee:
@@ -24,24 +25,41 @@ def notify_new_trip(context, direction, chat_id, date, time, slots=None, fee=Non
 
     text = "🔵 Se ha publicado un *nuevo viaje*:\n\n"
     text += format_trip_from_data(direction, date, chat_id, time, slots, fee=fee)
-    text += f"\n\nSi te interesa reservar un asiento, puedes hacerlo a través"\
-            f" del comando /verofertas\."
+    text_general = f"{text}\n\nSi te interesa reservar un asiento, puedes"\
+                   f" hacerlo a través del comando /verofertas\."
 
     # Obtain list of interested users for this trip
     weekday = weekdays[datetime.fromisoformat(date).weekday()]
     user_ids = get_users_for_offer_notification(direction, weekday, time)
+    # Make sure that the driver doesn't get notified
+    user_ids = list(set(user_ids)-set([str(chat_id)]))
 
     # Now get the possible users requesting a trip similar to this one
     time_before, time_after = get_time_range_from_center_time(time, 1)
     req_dict = get_requests_by_date_range(direction, date, time_before, time_after)
     if req_dict:
         req_user_ids = [str(req_dict[key]['Chat ID']) for key in req_dict]
-        user_ids = list(set(user_ids)|set(req_user_ids))
+        # Make sure that the driver doesn't get notified
+        req_user_ids = list(set(req_user_ids)-set([str(chat_id)]))
+        # Don't send general notifications to users that will receive the request-type one
+        user_ids = list(set(user_ids)-set(req_user_ids))
+        # Send a more convenient message to those who are requesting a trip
+        # with similar characteristics to this one
+        text_req = f"{text}\n\nComo has pedido un viaje con características"\
+                   f" similares, puedes mandar una solicitud de reserva"\
+                   f" directamente desde este mensaje:"
+        # TODO: Add handler for this callback in some request commands file, as
+        # a shortcut to call the SO_reserve function in actions_booking
+        cbd = "RSV"
+        keyboard = [[InlineKeyboardButton("Solicitar reserva",
+                        callback_data=ccd(cbd, direction[2:5], date, trip_key)),
+                     InlineKeyboardButton("❌ Descartar",
+                        callback_data=ccd(cbd, "DISMISS"))]]
+        send_message(context, req_user_ids, text_req, telegram.ParseMode.MARKDOWN_V2,
+                        reply_markup=InlineKeyboardMarkup(keyboard))
 
-    # Make sure that the driver doesn't get notified
-    user_ids = list(set(user_ids)-set([str(chat_id)]))
-
-    send_message(context, user_ids, text, telegram.ParseMode.MARKDOWN_V2)
+    # Send general notification to the rest of users
+    send_message(context, user_ids, text_general, telegram.ParseMode.MARKDOWN_V2)
 
 def notify_new_request(context, direction, chat_id, date, time):
     text = "🔴 Se ha publicado una *nueva petición* de viaje:\n\n"

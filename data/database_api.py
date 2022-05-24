@@ -873,6 +873,10 @@ def get_request_chat_id(direction, date, key):
     ref = db.reference(f"/Requests/{direction}/{date}/{key}")
     return ref.child('Chat ID').get()
 
+def get_request_time(direction, date, key):
+    ref = db.reference(f"/Requests/{direction}/{date}/{key}")
+    return ref.child('Time').get()
+
 def get_requests_by_date_range(direction, date, time_start=None, time_end=None):
     """Gets a dictionary with the trip requests for a given date and,
     optionally, time range

@@ -6,7 +6,7 @@ from data.database_api import (get_name, is_driver, get_slots, get_car,
                                get_trips_by_passenger,
                                get_offer_notification_by_user,
                                get_request_notification_by_user,
-                               get_request)
+                               get_request, get_requests_by_date_range)
 from telegram.utils.helpers import escape_markdown
 from utils.common import *
 
@@ -397,6 +397,50 @@ def get_formatted_request(direction, date, key, is_abbreviated=False):
     user_id = req_dict['Chat ID']
 
     return format_request_from_data(direction, date, user_id, time)
+
+def get_formatted_requests(direction, date, time_start=None, time_stop=None):
+    """Generates a formatted string with the trip requests in the
+    time range, or in the whole day if no times given.
+
+    Parameters
+    ----------
+    direction : string
+        Direction of the trip request. Can be 'toBenalmadena' or 'toUMA'.
+    date : string
+        Departure date with ISO format 'YYYY-mm-dd'.
+    time_start : string
+        Range's start time with ISO format 'HH:MM'. Optional
+    time_stop : string
+        Range's stop time with ISO format 'HH:MM'. Optional
+
+    Returns
+    -------
+    (string, list of strings)
+        Formatted string in Telegram's Markdown v2, and a list of the trip
+        requests' unique key IDs.
+
+    """
+    reqs_dict = get_requests_by_date_range(direction, date, time_start, time_stop)
+    index = 1
+
+    string_list = []
+    key_list = []
+    if reqs_dict:
+        for key in reqs_dict:
+            separator = escape_markdown("———————",2)
+            text = f"{separator} *Petición {str(index)}* {separator}\n"
+            text += format_request_from_data(chat_id=reqs_dict[key]['Chat ID'],
+                                            time=reqs_dict[key]['Time'])
+            string_list.append(text)
+            key_list.append(key)
+            index += 1
+
+    if string_list:
+        string = '\n\n'.join(string_list)
+    else:
+        string = ''
+
+    return string, key_list
 
 def get_driver_week_formatted_trips(chat_id):
     """Generates a formatted string with the offered trips for the next

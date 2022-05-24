@@ -3,7 +3,7 @@ import logging
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from commands import (actions, actions_config, actions_trip, actions_booking,
                       actions_mytrips, actions_mybookings, actions_notifications,
-                      actions_request)
+                      actions_request, actions_seerequests)
 import firebase_admin
 from firebase_admin import db
 import json
@@ -77,6 +77,9 @@ def main(webhook_flag = True):
 
     # Add request actions
     actions_request.add_handlers(dp)
+
+    # Add see request actions
+    actions_seerequests.add_handlers(dp)
 
     # Add notifications actions
     actions_notifications.add_handlers(dp)

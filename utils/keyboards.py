@@ -116,6 +116,45 @@ def trip_ids_keyboard(key_list, ikbs_list=None):
         keyboard += ikbs_list
     return InlineKeyboardMarkup(keyboard)
 
+def requests_ids_keyboard(key_list, ikbs_list=None):
+    """Creates an inline keyboard with numbered buttons that return the request
+    IDs.
+
+    Parameters
+    ----------
+    key_list : List[strings]
+        List with the strings of the requests' IDs.
+    ikbs_list : List[List[telegram.InlineKeyboardButton]]
+        If not None, the buttons in this list will be added at the bottom of
+        the inline keyboard.
+
+    Returns
+    -------
+    InlineKeyboardMarkup
+        The keyboard whose callback datas are the requests' IDs.
+
+    """
+    n_reqs = len(key_list)
+    n_rows = math.ceil(n_reqs/4)
+    n_cols = math.ceil(n_reqs/n_rows)
+    index = 0
+    cbd = 'REQ_ID'
+    keyboard = []
+    for i in range(n_rows):
+        row = []
+        for j in range(n_cols):
+            # If no more items, dont try to append more to row
+            if index==n_reqs:
+                continue
+            row.append(InlineKeyboardButton(str(index+1),
+                                callback_data=ccd(cbd,key_list[index])))
+            index += 1
+        keyboard.append(row)
+
+    if ikbs_list:
+        keyboard += ikbs_list
+    return InlineKeyboardMarkup(keyboard)
+
 def trips_keyboard(trips_dict, command, ikbs_list=None, show_extra_param=True,
                                                     show_passengers=True):
     """Creates an inline keyboard with formatted trips data which return
