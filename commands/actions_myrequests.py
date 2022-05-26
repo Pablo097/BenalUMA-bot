@@ -140,7 +140,7 @@ def MR_execute_action(update, context):
     # Check action to execute
     if data[1] == "CANCEL_CONFIRM":
         delete_request(direction, date, req_key)
-        text = escape_markdown(f"Tu petición de viaje ha sido anulado correctamente.",2)
+        text = escape_markdown(f"Tu petición de viaje ha sido anulada correctamente.",2)
 
     # Remove elements from user's dictionary
     for key in list(context.user_data.keys()):
