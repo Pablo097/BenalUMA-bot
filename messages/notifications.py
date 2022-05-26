@@ -1,4 +1,5 @@
 import logging, telegram, math
+from os import environ
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from telegram.utils.helpers import escape_markdown
@@ -134,3 +135,7 @@ def delete_user_notify(update, context, chat_id):
     if is_driver(chat_id):
         delete_driver_notify(update, context, chat_id)
     delete_user(chat_id)
+
+def debug_group_notify(context, text, parse_mode=None):
+    if "DEBUG_GROUP_CHAT_ID" in environ:
+        send_message(context, environ["DEBUG_GROUP_CHAT_ID"], text, parse_mode)

@@ -1,4 +1,5 @@
 import logging
+from os import environ
 from functools import wraps
 from telegram import Update, ChatAction
 from telegram.ext import CallbackContext
@@ -34,3 +35,13 @@ def send_typing_action(func):
         return func(update, context,  *args, **kwargs)
 
     return command_func
+
+def admin(func):
+    @wraps(func)
+    def wrapped(update, context, *args, **kwargs):
+        if str(update.effective_user.id)!=str(environ["ADMIN_CHAT_ID"]):
+            text = f"Para poder usar este comando debes ser administrador."
+            update.effective_message.reply_text(text)
+            return
+        return func(update, context, *args, **kwargs)
+    return wrapped

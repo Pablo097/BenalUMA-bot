@@ -1,12 +1,15 @@
+import logging, firebase_admin, json
 from os import environ
-import logging
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from firebase_admin import db
+from telegram import Update
+from telegram.ext import (Updater, CommandHandler, MessageHandler, CallbackContext,
+                            Filters, TypeHandler, DispatcherHandlerStop)
 from commands import (actions, actions_config, actions_trip, actions_booking,
                       actions_mytrips, actions_mybookings, actions_notifications,
-                      actions_request, actions_seerequests, actions_myrequests)
-import firebase_admin
-from firebase_admin import db
-import json
+                      actions_request, actions_seerequests, actions_myrequests,
+                      actions_admin)
+from data.database_api import is_banned
+from time import time
 
 PORT = int(environ.get('PORT', '8443'))
 TOKEN = environ["TOKEN"]
@@ -34,16 +37,34 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-# Define a few command handlers. These usually take the two arguments update and
-# context. Error handlers also receive the raised TelegramError object in error.
-def echo(update, context):
-    """Echo the user message."""
-    update.message.reply_text(update.message.text)
+def text_handler(update, context):
+    """Answers to a text message"""
+    text = f"¡Hola! Si no sabes cómo usar este bot, manda el comando /help"\
+           f" (puedes pulsar sobre el comando para que se envíe automáticamente)."\
+           f"\n\nPor favor, no me uses como tu basurero personal de mensajes,"\
+           f" porque en tal caso te banearé."
+    update.message.reply_text(text)
 
-def record(update, context):
-    """Logs message into database."""
-    ref = db.reference(f"/Users/{str(update.effective_chat.id)}")
-    ref.update({"message": ' '.join(context.args)})
+def callback(update, context):
+    """Checks whether user is banned to let they use the bot or not.
+    Also checks if the message comes from a private conversation or the debug group"""
+    # Check banned users
+    if is_banned(update.effective_chat.id):
+        restrict_until = context.user_data.get("restrictUntil", 0)
+        if restrict_until:
+            if time() > restrict_until:
+                context.user_data["restrictUntil"] = time() + 60*5 # 5 minutes
+                update.effective_message.reply_text("Estás baneado. No puedes usar el bot.")
+        else:
+            update.effective_message.reply_text("Estás baneado. No puedes usar el bot.")
+        raise DispatcherHandlerStop
+    # Check private chats
+    if update.effective_chat.type != 'private':
+        if not ("DEBUG_GROUP_CHAT_ID" in environ and
+                str(update.effective_chat.id)==str(environ["DEBUG_GROUP_CHAT_ID"])):
+            text = "Para usarme, escríbeme un mensaje privado a @BenalUMA_bot."
+            update.message.reply_text(text)
+            raise DispatcherHandlerStop
 
 def error(update, context):
     """Log Errors caused by Updates."""
@@ -57,8 +78,18 @@ def main(webhook_flag = True):
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
+    # Add a handler in a higher priority group to avoid banned users from using the bot
+    handler = TypeHandler(Update, callback)
+    dp.add_handler(handler, -1)
+
+    # log all errors
+    dp.add_error_handler(error)
+
     # Add general actions (start, help, register)
     actions.add_handlers(dp)
+
+    # Add administrator actions (ban, unban, broadcast)
+    actions_admin.add_handlers(dp)
 
     # Add configuration actions
     actions_config.add_handlers(dp)
@@ -83,18 +114,12 @@ def main(webhook_flag = True):
 
     # Add see request actions
     actions_myrequests.add_handlers(dp)
-    
+
     # Add notifications actions
     actions_notifications.add_handlers(dp)
 
-    # on different commands - answer in Telegram
-    dp.add_handler(CommandHandler("record", record))
-
     # on noncommand i.e message - echo the message on Telegram
-    dp.add_handler(MessageHandler(Filters.text, echo))
-
-    # log all errors
-    dp.add_error_handler(error)
+    dp.add_handler(MessageHandler(Filters.text, text_handler))
 
     # Start the Bot
     if webhook_flag:

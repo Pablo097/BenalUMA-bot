@@ -25,6 +25,21 @@ def add_user(chat_id, username):
     ref = db.reference(f"/Users/{str(chat_id)}")
     ref.set({"Name": username})
 
+def get_all_chat_ids():
+    """Gets a list with all registered users' chat IDs
+
+    Returns
+    -------
+    list(str)
+        List with registered chat IDs. 
+
+    """
+    users_dict = db.reference("/Users").get()
+    if users_dict:
+        return list(users_dict)
+    else:
+        return list()
+
 def is_registered(chat_id):
     """Checks whether a user is already registered in the database.
 
@@ -78,6 +93,67 @@ def set_name(chat_id, name):
     ref = db.reference(f"/Users/{str(chat_id)}")
     ref.update({'Name': name})
 
+def get_tg_username(chat_id):
+    """Gets the Telegram username given its chat_id.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id to check
+
+    Returns
+    -------
+    str
+        The Telegram username starting with '@'.
+
+    """
+
+    return db.reference(f"/Users/{str(chat_id)}/Username").get()
+
+def set_tg_username(chat_id, username):
+    """Sets the Telegram username given its chat_id.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id to check
+    username: string
+        The Telegram username of the user (it must start with '@')
+
+    Returns
+    -------
+    None
+
+    """
+    if username[0]!='@':
+        username = f"@{username}"
+    ref = db.reference(f"/Users/{str(chat_id)}")
+    ref.update({'Username': username})
+
+def get_chat_id_from_tg_username(username):
+    """Gets the chat_id from the given Telegram username.
+
+    Parameters
+    ----------
+    username: string
+        The Telegram username of the user (it must start with '@')
+
+    Returns
+    -------
+    str
+        The user chat_id, if it is associated with any Telegram username
+        in the database, an empty string otherwise.
+
+    """
+    if username[0]!='@':
+        username = f"@{username}"
+    user_dict = db.reference("/Users").order_by_child('Username').equal_to(username).get()
+    if user_dict:
+        for user_id in user_dict:
+            return user_id
+    else:
+        return ''
+
 def delete_user(chat_id):
     """Deletes user from database.
 
@@ -103,6 +179,58 @@ def delete_user(chat_id):
         delete_driver(chat_id)
     # Finally, completely delete user
     db.reference(f"/Users/{str(chat_id)}").delete()
+
+def ban_user(chat_id):
+    """Bans user from bot.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id to ban.
+
+    Returns
+    -------
+    None
+
+    """
+    # Delete user if registered
+    if is_registered(chat_id):
+        delete_user(chat_id)
+    # Put user ID in banned list
+    db.reference(f"/Banned/{str(chat_id)}").set(True)
+
+def is_banned(chat_id):
+    """Checks whether user is banned from bot.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id to check.
+
+    Returns
+    -------
+    Boolean
+        True if it is banned, False otherwise.
+
+    """
+    return True if db.reference(f"/Banned/{str(chat_id)}").get()==True else False
+
+def unban_user(chat_id):
+    """Unbans user from bot.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id to unban.
+
+    Returns
+    -------
+    None
+
+    """
+    if is_banned(chat_id):
+        db.reference(f"/Banned/{str(chat_id)}").delete()
+
 
 # Drivers
 

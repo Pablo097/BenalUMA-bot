@@ -7,7 +7,8 @@ from data.database_api import (is_registered, is_driver, set_name, set_car,
                                 set_slots, set_bizum, set_fee, add_driver,
                                 modify_offer_notification, modify_request_notification)
 from messages.format import get_formatted_user_config
-from messages.notifications import delete_driver_notify, delete_user_notify
+from messages.notifications import (delete_driver_notify, delete_user_notify,
+                                    debug_group_notify)
 from utils.keyboards import config_keyboard
 from utils.common import *
 from utils.decorators import registered
@@ -290,6 +291,9 @@ def update_user_property_callback(update, context):
         delete_user_notify(update, context, update.effective_chat.id)
         text = f"Tu cuenta se ha eliminado correctamente. \n¡Que te vaya bien! 🖖"
         query.edit_message_text(text)
+        debug_text = f"El usuario con ID `{update.effective_chat.id}` ha"\
+                     f" eliminado su cuenta\."
+        debug_group_notify(context, debug_text, telegram.ParseMode.MARKDOWN_V2)
         return ConversationHandler.END
 
     reply_markup = config_keyboard(update.effective_chat.id)
