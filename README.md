@@ -16,9 +16,11 @@ Go inside the project folder and install the dependencies through the `requireme
 pip install -r requirements.txt
 ```
 
-In the parent folder to the one where you have cloned the project (`BenalUMAbot`), create a file named `.env` where the environment variables will be stored. The Telegram bot token is obtained talking to the [@BotFather](https://t.me/BotFather), and the Firebase authentication information is downloaded from the Firebase project configuration. The content of the `.env` file must look like this:
+In the parent folder to the one where you have cloned the project (`BenalUMAbot`), create a file named `.env` where the environment variables will be stored. The Telegram bot token is obtained talking to the [@BotFather](https://t.me/BotFather), and the Firebase authentication information is downloaded from the Firebase project configuration. The user with the `ADMIN_CHAT_ID` will be able to use administrator-level commands, and if `DEBUG_GROUP_CHAT_ID` is configured, some debug messages will be sent to that group. The content of the `.env` file must look like this:
 ```
 TOKEN="<your_telegram_bot_token>"
+ADMIN_CHAT_ID="<your_telegram_chat_id>"
+DEBUG_GROUP_CHAT_ID="your_debug_group_telegram_chat_id"
 FIREBASE_PROJECT_ID="<...>"
 FIREBASE_PRIVATE_KEY_ID="<...>"
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n<...>\n-----END PRIVATE KEY-----\n"
