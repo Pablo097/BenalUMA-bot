@@ -4,16 +4,8 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
 from commands import actions_trip
-from data.database_api import (get_name, get_slots, get_trip, get_trip_chat_id,
-                                get_number_of_passengers, get_trip_slots,
-                                add_passenger, is_passenger, get_trip_time,
-                                get_requests_by_user_and_date, delete_request)
-from messages.format import (get_markdown2_inline_mention,
-                          get_formatted_trip_for_passenger,
-                          get_formatted_trip_for_driver,
-                          get_formatted_requests,
-                          format_request_from_data)
-from messages.message_queue import send_message
+from data.database_api import is_driver
+from messages.format import get_formatted_requests
 from utils.keyboards import (weekdays_keyboard, requests_ids_keyboard)
 from utils.time_picker import (time_picker_keyboard, process_time_callback)
 from utils.common import *
@@ -173,7 +165,7 @@ def SR_visualize(update, context):
     else:
         update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
 
-    if key_list:
+    if key_list and is_driver(update.effective_chat.id):
         text2 = f"Si quieres ofertar un viaje con las características"\
                 f" de alguna de estas peticiones, pulsa el botón correspondiente"\
                 f" al número de petición deseada:"

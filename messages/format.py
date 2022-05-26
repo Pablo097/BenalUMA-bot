@@ -6,7 +6,8 @@ from data.database_api import (get_name, is_driver, get_slots, get_car,
                                get_trips_by_passenger,
                                get_offer_notification_by_user,
                                get_request_notification_by_user,
-                               get_request, get_requests_by_date_range)
+                               get_request, get_requests_by_date_range,
+                               get_requests_by_user)
 from telegram.utils.helpers import escape_markdown
 from utils.common import *
 
@@ -370,7 +371,7 @@ def format_request_from_data(direction=None, date=None, chat_id=None, time=None,
 
     return string
 
-def get_formatted_request(direction, date, key, is_abbreviated=False):
+def get_formatted_request(direction, date, key):
     """Generates a formatted string with the request information.
 
     Parameters
@@ -381,9 +382,6 @@ def get_formatted_request(direction, date, key, is_abbreviated=False):
         Departure date with ISO format 'YYYY-mm-dd'
     key : type
         Unique key of the request in the DB.
-    is_abbreviated : boolean
-        Flag to indicate whether to abbreviate the message, only using
-        the emojis and writting all in one line, without Markdown.
 
     Returns
     -------
@@ -463,13 +461,14 @@ def get_driver_week_formatted_trips(chat_id):
     trips_dict = get_trips_by_driver(chat_id, week_strings[0], week_strings[-1], True)
 
     string = ""
+    week_string_list = []
     if trips_dict:
         for date in trips_dict:
             # Format string with trips
             header = f"*{weekday_strings[week_strings.index(date)]} "\
                      f"{date[8:10]}/{date[5:7]}*"
             sep_length = int(13-len(header)/2)
-            string += f"{'—'*5} {header} {'—'*sep_length}\n\n"
+            day_string_list = [f"{'—'*5} {header} {'—'*sep_length}"]
             for key in trips_dict[date]:
                 trip = trips_dict[date][key]
                 direction = trip['Direction']
@@ -477,9 +476,11 @@ def get_driver_week_formatted_trips(chat_id):
                 slots = trip['Slots'] if 'Slots' in trip else None
                 fee = trip['Fee'] if 'Fee' in trip else None
                 passengers_list = trip['Passengers'] if 'Passengers' in trip else None
-                string += format_trip_from_data(direction, time=time, slots=slots,
-                                    fee=fee, passenger_ids=passengers_list)
-                string += "\n\n"
+                day_string_list.append(format_trip_from_data(direction,
+                                            time=time, slots=slots, fee=fee,
+                                            passenger_ids=passengers_list))
+            week_string_list.append('\n\n'.join(day_string_list))
+        string = '\n\n'.join(week_string_list)
 
     return string, trips_dict
 
@@ -504,13 +505,14 @@ def get_user_week_formatted_bookings(chat_id):
     trips_dict = get_trips_by_passenger(chat_id, week_strings[0], week_strings[-1], True)
 
     string = ""
+    week_string_list = []
     if trips_dict:
         for date in trips_dict:
             # Format string with trips
             header = f"*{weekday_strings[week_strings.index(date)]} "\
                      f"{date[8:10]}/{date[5:7]}*"
             sep_length = int(13-len(header)/2)
-            string += f"{'—'*5} {header} {'—'*sep_length}\n\n"
+            day_string_list = [f"{'—'*5} {header} {'—'*sep_length}"]
             for key in trips_dict[date]:
                 trip = trips_dict[date][key]
                 driver_id = trip['Chat ID']
@@ -520,17 +522,58 @@ def get_user_week_formatted_bookings(chat_id):
                 slots = trip['Slots'] if 'Slots' in trip else get_slots(driver_id)
                 if 'Passengers' in trip:
                     slots -= len(trip['Passengers'])
-                    # Maybe it is also useful for passengers to see the other
-                    # passengers in their booked trips?
+                    # @PABLO: Maybe it is also useful for passengers to see
+                    # the other passengers in their booked trips?
                 car = get_car(driver_id)
                 bizum = get_bizum(driver_id)
 
-                string += format_trip_from_data(direction, chat_id=driver_id,
-                                            time=time, slots=slots, car=car,
-                                            fee=fee, bizum=bizum)
-                string += "\n\n"
+                day_string_list.append(format_trip_from_data(direction,
+                                            chat_id=driver_id, time=time,
+                                            slots=slots, car=car,
+                                            fee=fee, bizum=bizum))
+            week_string_list.append('\n\n'.join(day_string_list))
+        string = '\n\n'.join(week_string_list)
 
     return string, trips_dict
+
+def get_user_week_formatted_requests(chat_id):
+    """Generates a formatted string with the trip requests for the next
+    week ahead from a given user.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user.
+
+    Returns
+    -------
+    (string, dict)
+        Formatted string in Telegram's Markdown v2, and the dictionary with
+        the week ahead trip requests ordered by date.
+
+    """
+    week_strings = week_isoformats()
+    weekday_strings = weekdays_from_today()
+    reqs_dict = get_requests_by_user(chat_id, week_strings[0], week_strings[-1], True)
+
+    week_string_list = []
+    string = ""
+    if reqs_dict:
+        for date in reqs_dict:
+            # Format string with requests
+            header = f"*{weekday_strings[week_strings.index(date)]} "\
+                     f"{date[8:10]}/{date[5:7]}*"
+            sep_length = int(13-len(header)/2)
+            day_string_list = [f"{'—'*5} {header} {'—'*sep_length}"]
+            for key in reqs_dict[date]:
+                req = reqs_dict[date][key]
+                direction = req['Direction']
+                time = req['Time']
+                day_string_list.append(format_request_from_data(direction, time=time))
+            week_string_list.append('\n\n'.join(day_string_list))
+        string = '\n\n'.join(week_string_list)
+
+    return string, reqs_dict
 
 def get_formatted_offers_notif_config(chat_id, direction=None):
     notif_dict = get_offer_notification_by_user(chat_id, direction)

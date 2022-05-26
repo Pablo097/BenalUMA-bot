@@ -1,7 +1,7 @@
 import logging, math
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from data.database_api import is_driver, get_name
-from messages.format import format_trip_from_data
+from messages.format import format_trip_from_data, format_request_from_data
 from utils.common import (weekdays, weekdays_en, weekdays_from_today,
                             week_isoformats, ccd, scd)
 
@@ -192,6 +192,41 @@ def trips_keyboard(trips_dict, command, ikbs_list=None, show_extra_param=True,
                                         slots=slots, fee=fee,
                                         passenger_ids=passengers_list,
                                         is_abbreviated=True)
+            keyboard.append([InlineKeyboardButton(string,
+                        callback_data=ccd(cbd, direction[2:5], date, key))])
+
+    if ikbs_list:
+        keyboard += ikbs_list
+    return InlineKeyboardMarkup(keyboard)
+
+def requests_keyboard(reqs_dict, command, ikbs_list=None):
+    """Creates an inline keyboard with formatted requests data which return
+    callback datas with format "<command>;ID;<abbr_dir>;<date>;<key>" for each
+    request button.
+
+    Parameters
+    ----------
+    reqs_dict : dict
+        Dictionary with the ordered-by-date trip requests data.
+    ikbs_list : List[List[telegram.InlineKeyboardButton]]
+        If not None, the buttons in this list will be added at the bottom of
+        the inline keyboard.
+
+    Returns
+    -------
+    InlineKeyboardMarkup
+        The keyboard whose callback datas have the explained format.
+
+    """
+    cbd = ccd(command,'ID')
+    keyboard = []
+    for date in reqs_dict:
+        for key in reqs_dict[date]:
+            req = reqs_dict[date][key]
+            direction = req['Direction']
+            time = req['Time']
+            string = format_request_from_data(direction, date, time=time,
+                                                    is_abbreviated=True)
             keyboard.append([InlineKeyboardButton(string,
                         callback_data=ccd(cbd, direction[2:5], date, key))])
 

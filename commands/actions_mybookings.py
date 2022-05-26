@@ -37,8 +37,7 @@ def my_bookings(update, context):
 
     formatted_trips, trips_dict = get_user_week_formatted_bookings(update.effective_chat.id)
     if trips_dict:
-        text = f"Viajes reservados para los próximos 7 días:\n\n"
-        text += f"{formatted_trips} \n"
+        text = f"Viajes reservados para los próximos 7 días:\n\n{formatted_trips}"
         context.user_data['MB_dict'] = trips_dict
         keyboard = [[InlineKeyboardButton("Cancelar reserva", callback_data=ccd(cdh,"CANCEL"))]]
         keyboard += ikbs_end_MB
@@ -64,8 +63,7 @@ def my_bookings_restart(update, context):
 
     formatted_trips, trips_dict = get_user_week_formatted_bookings(update.effective_chat.id)
     if trips_dict:
-        text = f"Viajes reservados para los próximos 7 días:\n\n"
-        text += f"{formatted_trips} \n"
+        text = f"Viajes reservados para los próximos 7 días:\n\n{formatted_trips}"
         context.user_data['MB_dict'] = trips_dict
         keyboard = [[InlineKeyboardButton("Cancelar reserva", callback_data=ccd(cdh,"CANCEL"))]]
         keyboard += ikbs_end_MB

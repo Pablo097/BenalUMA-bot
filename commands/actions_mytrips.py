@@ -39,8 +39,7 @@ def my_trips(update, context):
 
     formatted_trips, trips_dict = get_driver_week_formatted_trips(update.effective_chat.id)
     if trips_dict:
-        text = f"Viajes ofertados para los próximos 7 días:\n\n"
-        text += f"{formatted_trips} \n"
+        text = f"Viajes ofertados para los próximos 7 días:\n\n{formatted_trips}"
         context.user_data['MT_dict'] = trips_dict
         keyboard = [[InlineKeyboardButton("Anular viaje", callback_data=ccd(cdh,"CANCEL"))],
                     [InlineKeyboardButton("Expulsar pasajero", callback_data=ccd(cdh,"REJECT"))]]
@@ -68,8 +67,7 @@ def my_trips_restart(update, context):
 
     formatted_trips, trips_dict = get_driver_week_formatted_trips(update.effective_chat.id)
     if trips_dict:
-        text = f"Viajes ofertados para los próximos 7 días:\n\n"
-        text += f"{formatted_trips} \n"
+        text = f"Viajes ofertados para los próximos 7 días:\n\n{formatted_trips}"
         context.user_data['MT_dict'] = trips_dict
         keyboard = [[InlineKeyboardButton("Anular viaje", callback_data=ccd(cdh,"CANCEL"))],
                     [InlineKeyboardButton("Expulsar pasajero", callback_data=ccd(cdh,"REJECT"))]]
