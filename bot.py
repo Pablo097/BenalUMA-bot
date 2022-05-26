@@ -42,7 +42,7 @@ def text_handler(update, context):
     text = f"¡Hola! Si no sabes cómo usar este bot, manda el comando /help"\
            f" (puedes pulsar sobre el comando para que se envíe automáticamente)."\
            f"\n\nPor favor, no me uses como tu basurero personal de mensajes,"\
-           f" porque en tal caso te banearé."
+           f" ya que en tal caso podrías ser baneado."
     update.message.reply_text(text)
 
 def callback(update, context):

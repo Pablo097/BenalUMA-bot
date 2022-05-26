@@ -65,11 +65,11 @@ def register_name(update, context):
     if update.effective_user.username:
         set_tg_username(update.effective_chat.id, update.effective_user.username)
 
-    reply_keyboard = [["Conduzco"], ["Pido coche"]]
+    reply_keyboard = [["Conduzco"], ["Sólo pido coche"]]
     text = f"Tu nombre ha sido guardado con éxito."\
-           f"\nIndica ahora si normalmente llevas o pides coche."
+           f"\nIndica ahora si sueles llevar coche o sólo pides."
     update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(
-        reply_keyboard, one_time_keyboard=True, input_field_placeholder='Normalmente...'
+        reply_keyboard, one_time_keyboard=True, input_field_placeholder='Yo...'
     ))
 
     return REG_USAGE
