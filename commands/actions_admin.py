@@ -43,6 +43,9 @@ def ban(update, context):
         return
 
     ban_user(user_id)
+    text_user = f"⛔ Has sido baneado. Tu cuenta se ha eliminado y no puedes"\
+                f" volver a usar el bot."
+    send_message(context, user_id, text_user)
     text = f"El usuario con ID `{user_id}` ha sido baneado\."
     update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return
@@ -67,6 +70,9 @@ def unban(update, context):
         return
 
     unban_user(user_id)
+    text_user = f"🆗 Has sido desbaneado. Puedes volver a crearte una cuenta"\
+                f" si lo deseas."
+    send_message(context, user_id, text_user)
     text = f"El usuario con ID `{user_id}` ha sido desbaneado\."
     update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return

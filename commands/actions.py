@@ -18,6 +18,9 @@ def start(update, context):
            f"\n\nPara comenzar, escribe /registro para registrarte en el sistema"\
            f" o /help para ver los comandos disponibles."
     update.message.reply_text(text)
+    if not is_registered(update.effective_chat.id):
+        debug_text = f"Nuevo usuario con ID `{update.effective_chat.id}`\."
+        debug_group_notify(context, debug_text, telegram.ParseMode.MARKDOWN_V2)
 
 def help(update, context):
     text = f"Comandos disponibles:\n"
@@ -43,6 +46,61 @@ def help(update, context):
 
     update.message.reply_text(text)
 
+def register_in_db(update, context, name, is_driver=False, slots=None, car=None):
+    """Auxiliar function to process the registration in the database"""
+    chat_id = update.effective_chat.id
+
+    add_user(chat_id, name)
+    if update.effective_user.username:
+        set_tg_username(chat_id, update.effective_user.username)
+
+    if is_driver:
+        add_driver(chat_id, slots, car)
+        set_fee(chat_id, MAX_FEE)
+        modify_request_notification(chat_id, 'toBenalmadena')
+        modify_request_notification(chat_id, 'toUMA')
+
+        text = f"Te has registrado correctamente. Se te ha configurado un precio"\
+               f" por trayecto de {str(MAX_FEE).replace('.',',')}€ por defecto."\
+               f" Puedes cambiar esto y más ajustes con el comando /config."\
+               f"\n¡Ya puedes empezar a usar el bot!"
+        update.message.reply_text(text)
+
+        text = f"Como conductor, se te ha aplicado una configuración de notificaciones"\
+               f" por defecto para que se te avise cada vez que alguien realiza una"\
+               f" nueva petición de viaje. Puedes cambiar esta configuración con el"\
+               f" comando /notificaciones."
+        send_message(context, chat_id, text)
+    else:
+        modify_offer_notification(chat_id, 'toBenalmadena')
+        modify_offer_notification(chat_id, 'toUMA')
+
+        text = f"Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
+        update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
+
+        text = f"Como pasajero, se te ha aplicado una configuración de notificaciones"\
+               f" por defecto para que se te avise cada vez que un nuevo viaje"\
+               f" sea publicado. Puedes cambiar esta configuración con el comando"\
+               f" /notificaciones."
+        send_message(context, chat_id, text)
+
+    text = f"Un aviso antes de que empieces a ofertar/reservar viajes:\nEste"\
+           f" bot necesita poder enlazar a tu perfil para que los demás"\
+           f" usuarios puedan contactar contigo por privado en caso de que"\
+           f" sea necesario \(por ejemplo, para tratar detalles más específi"\
+           f"cos del trayecto\)\.\nPara asegurarte de que el bot puede hacerlo"\
+           f" correctamente, por favor, comprueba que en los ajustes de Telegram,"\
+           f" en **'Privacidad y Seguridad' \> 'Mensajes reenviados'**, tengas"\
+           f" marcada la opción __Todos__ o, al menos, añadas este bot como "\
+           f" excepción\.\n¡Buen viaje\!"
+    send_message(context, chat_id, text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+
+    debug_text = f"El usuario con ID `{chat_id}` se ha"\
+                 f" registrado con la siguiente configuración:\n\n"\
+                 f"{get_formatted_user_config(chat_id)}"
+    debug_group_notify(context, debug_text, telegram.ParseMode.MARKDOWN_V2)
+    return
+
 def register(update, context):
     """Starts the register conversation process"""
     if is_registered(update.effective_chat.id):
@@ -61,9 +119,7 @@ def register(update, context):
 
 def register_name(update, context):
     """Stores username into DB and asks for their typical usage"""
-    add_user(update.effective_chat.id, update.message.text)
-    if update.effective_user.username:
-        set_tg_username(update.effective_chat.id, update.effective_user.username)
+    context.user_data['register_name'] = update.message.text
 
     reply_keyboard = [["Conduzco"], ["Sólo pido coche"]]
     text = f"Tu nombre ha sido guardado con éxito."\
@@ -84,35 +140,13 @@ def register_usage(update, context):
             input_field_placeholder='Número de asientos'))
         return REG_SLOTS
     else:
-        text = f"Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
-        update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
-        modify_offer_notification(update.effective_chat.id, 'toBenalmadena')
-        modify_offer_notification(update.effective_chat.id, 'toUMA')
-        text = f"Como pasajero, se te ha aplicado una configuración de notificaciones"\
-               f" por defecto para que se te avise cada vez que un nuevo viaje"\
-               f" sea publicado. Puedes cambiar esta configuración con el comando"\
-               f" /notificaciones."
-        send_message(context, update.effective_chat.id, text)
-        text = f"Un aviso antes de que empieces a ofertar/reservar viajes:\nEste"\
-               f" bot necesita poder enlazar a tu perfil para que los demás"\
-               f" usuarios puedan contactar contigo por privado en caso de que"\
-               f" sea necesario \(por ejemplo, para tratar detalles más específi"\
-               f"cos del trayecto\)\.\nPara asegurarte de que el bot puede hacerlo"\
-               f" correctamente, por favor, comprueba que en los ajustes de Telegram,"\
-               f" en **'Privacidad y Seguridad' \> 'Mensajes reenviados'**, tengas"\
-               f" marcada la opción __Todos__ o, al menos, añadas este bot como "\
-               f" excepción\.\n¡Buen viaje\!"
-        send_message(context, update.effective_chat.id, text,
-                                parse_mode=telegram.ParseMode.MARKDOWN_V2)
-        debug_text = f"El usuario con ID `{update.effective_chat.id}` se ha"\
-                     f" registrado con la siguiente configuración:\n\n"\
-                     f"{get_formatted_user_config(update.effective_chat.id)}"
-        debug_group_notify(context, debug_text, telegram.ParseMode.MARKDOWN_V2)
+        name = context.user_data.pop('register_name')
+        register_in_db(update, context, name)
         return ConversationHandler.END
 
 def register_slots(update, context):
     """Stores user slots and continues conversation"""
-    context.user_data['slots'] = update.message.text
+    context.user_data['register_slots'] = int(update.message.text)
 
     text = f"Finalmente, indica el modelo y color de tu coche para facilitar a "\
            f"los pasajeros reconocerlo cuando los recojas."
@@ -122,39 +156,11 @@ def register_slots(update, context):
 
 def register_car(update, context):
     """Stores driver info into DB and ends the conversation"""
-    slots = int(context.user_data['slots'])
+    name = context.user_data.pop('register_name')
+    slots = context.user_data.pop('register_slots')
     car = update.message.text
-    context.user_data.clear()
-    add_driver(update.effective_chat.id, slots, car)
-    set_fee(update.effective_chat.id, MAX_FEE)
 
-    text = f"Te has registrado correctamente. Se te ha configurado un precio"\
-           f" por trayecto de {str(MAX_FEE).replace('.',',')}€ por defecto."\
-           f" Puedes cambiar esto y más ajustes con el comando /config."\
-           f"\n¡Ya puedes empezar a usar el bot!"
-    update.message.reply_text(text)
-    modify_request_notification(update.effective_chat.id, 'toBenalmadena')
-    modify_request_notification(update.effective_chat.id, 'toUMA')
-    text = f"Como conductor, se te ha aplicado una configuración de notificaciones"\
-           f" por defecto para que se te avise cada vez que alguien realiza una"\
-           f" nueva petición de viaje. Puedes cambiar esta configuración con el"\
-           f" comando /notificaciones."
-    send_message(context, update.effective_chat.id, text)
-    text = f"Un aviso antes de que empieces a ofertar/reservar viajes:\nEste"\
-           f" bot necesita poder enlazar a tu perfil para que los demás"\
-           f" usuarios puedan contactar contigo por privado en caso de que"\
-           f" sea necesario \(por ejemplo, para tratar detalles más específi"\
-           f"cos del trayecto\)\.\nPara asegurarte de que el bot puede hacerlo"\
-           f" correctamente, por favor, comprueba que en los ajustes de Telegram,"\
-           f" en **'Privacidad y Seguridad' \> 'Mensajes reenviados'**, tengas"\
-           f" marcada la opción __Todos__ o, al menos, añadas este bot como "\
-           f" excepción\.\n¡Buen viaje\!"
-    send_message(context, update.effective_chat.id, text,
-                            parse_mode=telegram.ParseMode.MARKDOWN_V2)
-    debug_text = f"El usuario con ID `{update.effective_chat.id}` se ha"\
-                 f" registrado con la siguiente configuración:\n\n"\
-                 f"{get_formatted_user_config(update.effective_chat.id)}"
-    debug_group_notify(context, debug_text, telegram.ParseMode.MARKDOWN_V2)
+    register_in_db(update, context, name, True, slots, car)
 
     return ConversationHandler.END
 
@@ -162,6 +168,10 @@ def register_cancel(update, context):
     """Cancels registration and ends the conversation."""
     update.message.reply_text('Has cancelado el proceso de registro.',
                                 reply_markup=ReplyKeyboardRemove())
+    # Delete possible saved data
+    for key in list(context.user_data.keys()):
+        if key.startswith('register_'):
+            del context.user_data[key]
     return ConversationHandler.END
 
 def add_handlers(dispatcher):
@@ -173,7 +183,7 @@ def add_handlers(dispatcher):
         entry_points=[CommandHandler('registro', register)],
         states={
             REG_NAME: [MessageHandler(Filters.text & ~Filters.command, register_name)],
-            REG_USAGE: [MessageHandler(Filters.regex('^(Conduzco|Pido coche)$'),
+            REG_USAGE: [MessageHandler(Filters.regex('^(Conduzco|Sólo pido coche)$'),
                                     register_usage)],
             REG_SLOTS: [
                 MessageHandler(Filters.regex('^(1|2|3|4|5|6)$'), register_slots),
