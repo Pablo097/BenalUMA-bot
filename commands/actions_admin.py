@@ -84,9 +84,10 @@ def broadcast(update, context):
         update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return
 
-    message = ' '.join(context.args)
-    # send_message(context, get_all_chat_ids(), message)
-    send_message(context, -670302037, message)
+    # message = ' '.join(context.args)
+    message = update.message.text.split(" ",1)[1]
+    send_message(context, get_all_chat_ids(), message)
+    
     return
 
 def add_handlers(dispatcher):
