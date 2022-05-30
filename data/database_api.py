@@ -31,7 +31,7 @@ def get_all_chat_ids():
     Returns
     -------
     list(str)
-        List with registered chat IDs. 
+        List with registered chat IDs.
 
     """
     users_dict = db.reference("/Users").get()
@@ -1200,6 +1200,8 @@ def get_offer_notification_by_user(chat_id, direction=None):
             return dict()
         for dir in notif_dict:
             notif_dict[dir] = dict(sorted(notif_dict[dir].items(), key=lambda x: wd_aux.index(x[0])))
+        # Make toUMA direction go first
+        notif_dict = dict(reversed(list(notif_dict.items())))
     else:
         notif_dict = ref.child(direction).get()
         if not notif_dict:
@@ -1237,6 +1239,8 @@ def get_request_notification_by_user(chat_id, direction=None):
             return dict()
         for dir in notif_dict:
             notif_dict[dir] = dict(sorted(notif_dict[dir].items(), key=lambda x: wd_aux.index(x[0])))
+        # Make toUMA direction go first
+        notif_dict = dict(reversed(list(notif_dict.items())))
     else:
         notif_dict = ref.child(direction).get()
         if not notif_dict:

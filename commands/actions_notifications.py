@@ -41,8 +41,8 @@ def offer_config_text_and_markup(chat_id, is_first=False):
     text += f"\n\nSi deseas cambiar tus preferencias, indica primero para qué dirección:"
 
     opt = "OFFERS"
-    keyboard = [[InlineKeyboardButton("Viajes hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))],
-                [InlineKeyboardButton("Viajes hacia la UMA", callback_data=ccd(cdh,opt,'UMA'))]]
+    keyboard = [[InlineKeyboardButton("Viajes hacia la UMA", callback_data=ccd(cdh,opt,'UMA'))],
+                [InlineKeyboardButton("Viajes hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
     keyboard += ikbs_end_notif
 
     return text, InlineKeyboardMarkup(keyboard)
@@ -63,8 +63,8 @@ def request_config_text_and_markup(chat_id):
             f" a nadie\. Si eso es lo que quieres hacer, elige primero la dirección:"
 
     opt = "REQUESTS"
-    keyboard = [[InlineKeyboardButton("Viajes hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))],
-                [InlineKeyboardButton("Viajes hacia la UMA", callback_data=ccd(cdh,opt,'UMA'))]]
+    keyboard = [[InlineKeyboardButton("Viajes hacia la UMA", callback_data=ccd(cdh,opt,'UMA'))],
+                [InlineKeyboardButton("Viajes hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
     keyboard += ikbs_end_notif
 
     return text, InlineKeyboardMarkup(keyboard)
