@@ -1,5 +1,4 @@
 import logging, re
-from datetime import datetime
 from data.database_api import (get_name, is_driver, get_slots, get_car,
                                get_fee, get_bizum, get_trip,
                                get_trips_by_date_range, get_trips_by_driver,
@@ -95,12 +94,18 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         if chat_id:
             fields.append(f"🧑 *Conductor*: {get_markdown2_inline_mention(chat_id)}")
         if direction:
-            fields.append(f"📍 *Dirección*: `{direction[2:]}`")
+            fields.append(f"📍 *Dirección*: `{dir_dict.get(direction, direction[2:])}`")
         if date:
-            weekday = weekdays[datetime.fromisoformat(date).weekday()]
+            weekday = get_weekday_from_date(date)
             fields.append(f"📅 *Fecha*: `{weekday} {date[8:10]}/{date[5:7]}`")
         if time:
-            fields.append(f"🕖 *Hora*: `{time}`")
+            text_aux=''
+            if direction:
+                if direction==list(dir_dict.keys())[0]:
+                    text_aux = ' \(llegada\)'
+                if direction==list(dir_dict.keys())[1]:
+                    text_aux = ' \(salida\)'
+            fields.append(f"🕖 *Hora{text_aux}*: `{time}`")
         if slots:
             fields.append(f"💺 *Asientos disponibles*: `{str(slots)}`")
         if car:
@@ -117,9 +122,9 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         if chat_id:
             fields.append(f"🧑 {get_name(chat_id)}")
         if direction:
-            fields.append(f"📍 {direction[2:]}")
+            fields.append(f"📍 {dir_dict.get(direction, direction[2:])}")
         if date:
-            weekday = weekdays[datetime.fromisoformat(date).weekday()]
+            weekday = get_weekday_from_date(date)
             fields.append(f"📅 {weekday} {date[8:10]}")
         if time:
             fields.append(f"🕖 {time}")
@@ -233,7 +238,7 @@ def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None
     trips_dict = get_trips_by_date_range(direction, date, time_start, time_stop)
     index = 1
 
-    string = ""
+    string_list = []
     key_list = []
     if trips_dict:
         for key in trips_dict:
@@ -253,15 +258,18 @@ def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None
 
                 separator = escape_markdown("———————",2)
                 # separator = escape_markdown("‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ",2)
-                string += f"{separator} *Opción {str(index)}* {separator}\n"
-                string += format_trip_from_data(chat_id=trips_dict[key]['Chat ID'],
+                text = f"{separator} *Opción {str(index)}* {separator}\n"
+                text += format_trip_from_data(chat_id=trips_dict[key]['Chat ID'],
                                                 time=trips_dict[key]['Time'],
                                                 slots=slots, fee=fee)
-                string += "\n\n"
-                index += 1
+                string_list.append(text)
                 key_list.append(key)
+                index += 1
+
+    if string_list:
+        string = '\n\n'.join(string_list)
     else:
-        string = "No existen viajes ofertados en las fechas seleccionadas\."
+        string = ''
 
     return string, key_list
 
@@ -350,20 +358,26 @@ def format_request_from_data(direction=None, date=None, chat_id=None, time=None,
         if chat_id:
             fields.append(f"🧑 *Solicitante*: {get_markdown2_inline_mention(chat_id)}")
         if direction:
-            fields.append(f"📍 *Dirección*: `{direction[2:]}`")
+            fields.append(f"📍 *Dirección*: `{dir_dict.get(direction, direction[2:])}`")
         if date:
-            weekday = weekdays[datetime.fromisoformat(date).weekday()]
+            weekday = get_weekday_from_date(date)
             fields.append(f"📅 *Fecha*: `{weekday} {date[8:10]}/{date[5:7]}`")
         if time:
-            fields.append(f"🕖 *Hora*: `{time}`")
+            text_aux=''
+            if direction:
+                if direction==list(dir_dict.keys())[0]:
+                    text_aux = ' \(llegada\)'
+                if direction==list(dir_dict.keys())[1]:
+                    text_aux = ' \(salida\)'
+            fields.append(f"🕖 *Hora{text_aux}*: `{time}`")
         string = '\n'.join(fields)
     else:
         if chat_id:
             fields.append(f"🧑 {get_name(chat_id)}")
         if direction:
-            fields.append(f"📍 {direction[2:]}")
+            fields.append(f"📍 {dir_dict.get(direction, direction[2:])}")
         if date:
-            weekday = weekdays[datetime.fromisoformat(date).weekday()]
+            weekday = get_weekday_from_date(date)
             fields.append(f"📅 {weekday} {date[8:10]}")
         if time:
             fields.append(f"🕖 {time}")
@@ -602,7 +616,7 @@ def get_formatted_offers_notif_config(chat_id, direction=None):
         dir_string_list = []
         dir_string = ""
         for dir in notif_dict:
-            dir_string = f"➡️ Hacia {dir[2:]}:\n"
+            dir_string = f"➡️ Hacia {dir_dict2.get(dir, dir[2:])}:\n"
             dir_string += format_dir(notif_dict[dir])
             dir_string_list.append(dir_string)
         if dir_string_list:
@@ -639,7 +653,7 @@ def get_formatted_requests_notif_config(chat_id, direction=None):
         dir_string_list = []
         dir_string = ""
         for dir in notif_dict:
-            dir_string = f"➡️ Hacia {dir[2:]}:\n"
+            dir_string = f"➡️ Hacia {dir_dict2.get(dir, dir[2:])}:\n"
             dir_string += format_dir(notif_dict[dir])
             dir_string_list.append(dir_string)
         if dir_string_list:

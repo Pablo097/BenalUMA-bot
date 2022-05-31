@@ -193,7 +193,7 @@ def trips_keyboard(trips_dict, command, ikbs_list=None, show_extra_param=True,
                                         passenger_ids=passengers_list,
                                         is_abbreviated=True)
             keyboard.append([InlineKeyboardButton(string,
-                        callback_data=ccd(cbd, direction[2:5], date, key))])
+                        callback_data=ccd(cbd, direction[2:5].upper(), date, key))])
 
     if ikbs_list:
         keyboard += ikbs_list
@@ -228,7 +228,7 @@ def requests_keyboard(reqs_dict, command, ikbs_list=None):
             string = format_request_from_data(direction, date, time=time,
                                                     is_abbreviated=True)
             keyboard.append([InlineKeyboardButton(string,
-                        callback_data=ccd(cbd, direction[2:5], date, key))])
+                        callback_data=ccd(cbd, direction[2:5].upper(), date, key))])
 
     if ikbs_list:
         keyboard += ikbs_list

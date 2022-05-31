@@ -49,11 +49,9 @@ def notify_new_trip(context, trip_key, direction, chat_id, date, time, slots=Non
         text_req = f"{text}\n\nComo has pedido un viaje con características"\
                    f" similares, puedes mandar una solicitud de reserva"\
                    f" directamente desde este mensaje:"
-        # TODO: Add handler for this callback in some request commands file, as
-        # a shortcut to call the SO_reserve function in actions_booking
         cbd = "RSV"
         keyboard = [[InlineKeyboardButton("Solicitar reserva",
-                        callback_data=ccd(cbd, direction[2:5], date, trip_key)),
+                        callback_data=ccd(cbd, direction[2:5].upper(), date, trip_key)),
                      InlineKeyboardButton("❌ Descartar",
                         callback_data=ccd(cbd, "DISMISS"))]]
         send_message(context, req_user_ids, text_req, telegram.ParseMode.MARKDOWN_V2,

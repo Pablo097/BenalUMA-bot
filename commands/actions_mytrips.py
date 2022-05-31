@@ -136,10 +136,7 @@ def choose_trip(update, context):
 #     direction = data[1]
 #     date = data[2]
 #     trip_key = ';'.join(data[3:])   # Just in case the unique ID constains a ';'
-#     if direction == 'Ben':
-#         direction = 'toBenalmadena'
-#     elif direction == 'UMA':
-#         direction = 'toUMA'
+    # direction = abbr_dir_dict[direction]
 #
 #     # Save trip parameters
 #     context.user_data['MT_dir'] = direction
@@ -171,10 +168,7 @@ def cancel_trip(update, context):
     direction = data[2]
     date = data[3]
     trip_key = ';'.join(data[4:])   # Just in case the unique ID constains a ';'
-    if direction == 'Ben':
-        direction = 'toBenalmadena'
-    elif direction == 'UMA':
-        direction = 'toUMA'
+    direction = abbr_dir_dict[direction]
 
     # Save trip parameters
     context.user_data['MT_dir'] = direction
@@ -210,10 +204,7 @@ def reject_passenger(update, context):
     direction = data[2]
     date = data[3]
     trip_key = ';'.join(data[4:])   # Just in case the unique ID constains a ';'
-    if direction == 'Ben':
-        direction = 'toBenalmadena'
-    elif direction == 'UMA':
-        direction = 'toUMA'
+    direction = abbr_dir_dict[direction]
 
     # Save trip parameters
     context.user_data['MT_dir'] = direction

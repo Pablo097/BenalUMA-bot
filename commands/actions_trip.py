@@ -17,7 +17,7 @@ from utils.decorators import registered, driver
 cdh = "NT"   # Callback Data Header
 
 # Abort/Cancel buttons
-ikbs_abort_trip = [[InlineKeyboardButton("Abortar", callback_data=ccd(cdh,'ABORT'))]]
+ikbs_abort_trip = [[InlineKeyboardButton("❌ Abortar", callback_data=ccd(cdh,'ABORT'))]]
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,11 @@ def new_trip(update, context):
             del context.user_data[key]
 
     opt = "DIR"
-    keyboard = [[InlineKeyboardButton("Hacia la UMA", callback_data=ccd(cdh,opt,'UMA')),
-                 InlineKeyboardButton("Hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
-    keyboard += ikbs_abort_trip
+    row = []
+    for dir in dir_dict2:
+        row.append(InlineKeyboardButton(f"Hacia {dir_dict2[dir]}",
+                                    callback_data=ccd(cdh,opt,dir[2:5].upper())))
+    keyboard = [row] + ikbs_abort_trip
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"Vas a ofertar un nuevo viaje. Primero, indica en qué dirección viajas:"
@@ -53,10 +55,8 @@ def select_date(update, context):
     if not (data[0]==cdh and data[1]=='DIR'):
         raise SyntaxError('This callback data does not belong to the select_date function.')
 
-    if data[2] == "UMA":
-        context.user_data['trip_dir'] = 'toUMA'
-    elif data[2] == "BEN":
-        context.user_data['trip_dir'] = 'toBenalmadena'
+    if data[2] in abbr_dir_dict:
+        context.user_data['trip_dir'] = abbr_dir_dict[data[2]]
     else:
         logger.warning("Error in trip direction argument.")
         text = f"Error en opción recibida. Abortando..."
@@ -78,8 +78,12 @@ def select_hour(update, context):
         raise SyntaxError('This callback data does not belong to the select_hour function.')
 
     context.user_data['trip_date'] = data[1]
-    text = f"Ahora dime, ¿a qué hora pretendes salir desde "\
-           f"{'Benalmádena' if context.user_data['trip_dir']=='toUMA' else 'la UMA'}?"\
+    text_aux = 'salir'
+    if context.user_data['trip_dir']==list(dir_dict.keys())[0]:
+        text_aux = f"llegar a {dir_dict2[context.user_data['trip_dir']]}"
+    elif context.user_data['trip_dir']==list(dir_dict.keys())[1]:
+        text_aux = f"salir hacia {dir_dict2[context.user_data['trip_dir']]}"
+    text = f"Ahora dime, ¿a qué hora pretendes {text_aux}?"\
            f"\n(También puedes mandarme un mensaje con la hora directamente)"
     reply_markup = time_picker_keyboard(ikbs_list=ikbs_abort_trip)
     query.edit_message_text(text=text, reply_markup=reply_markup)
@@ -95,7 +99,8 @@ def send_select_more_message(update, context):
 
     keyboard = [[InlineKeyboardButton("Configurar asientos", callback_data=ccd(cdh,"SLOTS"))],
                 [InlineKeyboardButton("Configurar precio", callback_data=ccd(cdh,"PRICE"))],
-                [InlineKeyboardButton("Terminar", callback_data=ccd(cdh,"DONE"))]]
+                [ikbs_abort_trip[0][0],
+                 InlineKeyboardButton("✅ Terminar", callback_data=ccd(cdh,"DONE"))]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"Tu viaje se publicará con los siguientes datos:\n\n"
@@ -265,6 +270,8 @@ def trip_abort(update, context):
 
 def add_handlers(dispatcher):
     regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'
+    adl = list(abbr_dir_dict.keys())    # Abbreviated directions list
+    dir_aux = f"({adl[0]}|{adl[1]})"
 
     # Create conversation handler for 'new trip'
     global trip_conv_handler
@@ -273,7 +280,7 @@ def add_handlers(dispatcher):
                       CallbackQueryHandler(select_more_from_SR, pattern="^REQ_ID[^\ \n]*")],
         states={
             TRIP_START: [
-                CallbackQueryHandler(select_date, pattern=f"^{ccd(cdh,'DIR','(UMA|BEN)')}$"),
+                CallbackQueryHandler(select_date, pattern=f"^{ccd(cdh,'DIR',dir_aux)}$"),
             ],
             TRIP_DATE: [
                 CallbackQueryHandler(select_hour, pattern=f"^{ccd(cdh,regex_iso_date)}$"),

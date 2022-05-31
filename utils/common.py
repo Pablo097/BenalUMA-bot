@@ -5,6 +5,12 @@ from pytz import timezone
 
 MAX_FEE = 1.5
 
+# Dictionaries for generalizing the code and making it prettier
+dir_dict = {'toUMA': 'UMA', 'toBenalmadena':'Benalmádena'}
+dir_dict2 = dict(dir_dict.items())
+dir_dict2[list(dir_dict.keys())[0]] = 'la '+dir_dict2[list(dir_dict.keys())[0]]
+abbr_dir_dict = {key[2:5].upper():key for (key,value) in dir_dict.items()}
+
 emoji_numbers = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 weekdays_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -102,6 +108,22 @@ def today_isoformat():
 
     """
     return dates_from_today(1)[0].isoformat()
+
+def get_weekday_from_date(date):
+    """Returns a string with the weekday of the given date.
+
+    Parameters
+    ----------
+    date : string
+        Date with ISO format 'YYYY-mm-dd'
+
+    Returns
+    -------
+    str
+        Weekday of the date.
+
+    """
+    return weekdays[datetime.fromisoformat(date).weekday()]
 
 def current_time_isoformat(minutes_divisor=None):
     """Returns the string representation of the current time.

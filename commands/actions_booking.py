@@ -37,9 +37,11 @@ def see_offers(update, context):
         sent_message.edit_reply_markup(None)
 
     opt = 'DIR'
-    keyboard = [[InlineKeyboardButton("Hacia la UMA", callback_data=ccd(cdh,opt,'UMA')),
-                 InlineKeyboardButton("Hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
-    keyboard += ikbs_cancel_SO
+    row = []
+    for dir in dir_dict2:
+        row.append(InlineKeyboardButton(f"Hacia {dir_dict2[dir]}",
+                                    callback_data=ccd(cdh,opt,dir[2:5].upper())))
+    keyboard = [row] + ikbs_cancel_SO
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"Indica la dirección de los viajes ofertados que quieres ver:"
@@ -55,10 +57,8 @@ def SO_select_date(update, context):
     if not (data[0]==cdh and data[1]=='DIR'):
         raise SyntaxError('This callback data does not belong to the SO_select_date function.')
 
-    if data[2]  == "UMA":
-        context.user_data['SO_dir'] = 'toUMA'
-    elif data[2]  == "BEN":
-        context.user_data['SO_dir'] = 'toBenalmadena'
+    if data[2] in abbr_dir_dict:
+        context.user_data['SO_dir'] = abbr_dir_dict[data[2]]
     else:
         logger.warning("Error in SO direction argument.")
         text = f"Error en opción recibida. Abortando..."
@@ -156,13 +156,22 @@ def SO_visualize(update, context):
     dir = context.user_data['SO_dir']
     date = context.user_data['SO_date']
 
-    text = f"Viajes ofertados hacia {'la *UMA*' if dir=='toUMA' else '*Benalmádena*'}"\
-           f" el día *{date[8:10]}/{date[5:7]}*"
+    text = f"Viajes ofertados hacia *{dir_dict2[dir]}*"\
+           f" el {get_weekday_from_date(date)} día *{date[8:10]}/{date[5:7]}*"
     if time_start:
         text += f" entre las *{time_start}* y las *{time_stop}*"
     text += f":\n\n"
     text_aux, key_list = get_formatted_offered_trips(dir, date, time_start, time_stop)
-    text += text_aux
+    if text_aux:
+        text += text_aux
+        if dir==list(dir_dict.keys())[0]:
+            text += f"\n\nRecuerda que, en sentido {list(dir_dict.values())[1]}"\
+                    f"→{dir_dict[dir]}, se indica la hora de llegada estimada\."
+        elif dir==list(dir_dict.keys())[1]:
+            text += f"\n\nRecuerda que, en sentido {list(dir_dict.values())[0]}"\
+                    f"→{dir_dict[dir]}, se indica la hora de salida\."
+    else:
+        text += "No existen viajes ofertados en las fechas seleccionadas\."
 
     if is_query:
         query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
@@ -224,9 +233,9 @@ def SO_reserve(update, context):
 
     cbd = 'ALERT'
     driver_keyboard = [[InlineKeyboardButton("✅ Confirmar",
-                callback_data=ccd(cbd, 'Y', user_id, dir[2:5], date, trip_key)),
+                callback_data=ccd(cbd, 'Y', user_id, dir[2:5].upper(), date, trip_key)),
                         InlineKeyboardButton("❌ Rechazar",
-                callback_data=ccd(cbd, 'N', user_id, dir[2:5], date, trip_key))]]
+                callback_data=ccd(cbd, 'N', user_id, dir[2:5].upper(), date, trip_key))]]
     try:
         context.bot.send_message(driver_id, text_driver,
                                 reply_markup=InlineKeyboardMarkup(driver_keyboard),
@@ -282,10 +291,7 @@ def alert_user(update, context):
 
     action, user_id, dir, date = data[1:5]
     trip_key = ';'.join(data[5:])   # Just in case the unique ID constains a ';'
-    if dir == 'Ben':
-        dir = 'toBenalmadena'
-    elif dir == 'UMA':
-        dir = 'toUMA'
+    dir = abbr_dir_dict[dir]
 
     reservation_ok = False
     # Check that trip still exists
@@ -351,15 +357,40 @@ def alert_user(update, context):
                     send_message(context, user_id, text_booker2,
                                             telegram.ParseMode.MARKDOWN_V2)
 
+# @PABLO: This function has not been tested yet
+def reserve_from_notification(update, context):
+    """Gateway to SO_reserve when booking from a new trip notification"""
+    query = update.callback_query
+    data = scd(query.data)
+    if data[0] != 'RSV':
+        raise SyntaxError('This callback data does not belong to the reserve_from_notification function.')
+
+    if data[1]=='DISMISS':
+        query.answer()
+        query.edit_message_reply_markup()
+        return
+
+    dir, date = data[1:2]
+    trip_key = ';'.join(data[3:])   # Just in case the unique ID constains a ';'
+
+    context.user_data['SO_dir'] = abbr_dir_dict[dir]
+    context.user_data['SO_date'] = date
+    query.data = ccd('TRIP_ID', trip_key)
+
+    SO_reserve(update, context)
+    return
+
 def add_handlers(dispatcher):
     regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'
+    adl = list(abbr_dir_dict.keys())    # Abbreviated directions list
+    dir_aux = f"({adl[0]}|{adl[1]})"
 
     # Create conversation handler for 'see offers'
     SO_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('verofertas', see_offers)],
         states={
             SO_START: [
-                CallbackQueryHandler(SO_select_date, pattern=f"^{ccd(cdh,'DIR','(UMA|BEN)')}$"),
+                CallbackQueryHandler(SO_select_date, pattern=f"^{ccd(cdh,'DIR',dir_aux)}$"),
             ],
             SO_DATE: [
                 CallbackQueryHandler(SO_select_hour, pattern=f"^{ccd(cdh,regex_iso_date)}$"),
@@ -389,3 +420,6 @@ def add_handlers(dispatcher):
 
     # Create Callback Query handler for 'alert user'
     dispatcher.add_handler(CallbackQueryHandler(alert_user, pattern="^ALERT.*"))
+
+    # Create Callback Query handler for 'reserve from notification'
+    dispatcher.add_handler(CallbackQueryHandler(reserve_from_notification, pattern="^RSV.*"))

@@ -2,7 +2,7 @@ import firebase_admin
 from firebase_admin import db
 import json
 from datetime import datetime
-from utils.common import week_isoformats, weekdays_en
+from utils.common import week_isoformats, weekdays_en, dir_dict
 from collections import OrderedDict
 
 # General
@@ -621,7 +621,7 @@ def get_trips_by_driver(chat_id, date_start=None, date_end=None, order_by_date=F
     ref = db.reference(f"/Drivers/{chat_id}/Offers")
     trips_dict = dict()
 
-    for dir in ['toBenalmadena', 'toUMA']:
+    for dir in list(dir_dict.keys()):
         query = ref.child(dir).order_by_key()
         if date_start:
             query = query.start_at(date_start)
@@ -668,7 +668,7 @@ def get_trips_by_driver(chat_id, date_start=None, date_end=None, order_by_date=F
     # # OLD IMPLEMENTATION
     # ref = db.reference("/Trips/")
     # all_trips = dict()
-    # for dir in ['toBenalmadena', 'toUMA']:
+    # for dir in list(dir_dict.keys()):
     #     dir_trips = dict()
     #     ref2 = ref.child(dir)
     #
@@ -711,7 +711,7 @@ def get_trips_by_passenger(chat_id, date_start=None, date_end=None, order_by_dat
     ref = db.reference(f"/Passengers/{chat_id}")
     trips_dict = dict()
 
-    for dir in ['toBenalmadena', 'toUMA']:
+    for dir in list(dir_dict.keys()):
         query = ref.child(dir).order_by_key()
         if date_start:
             query = query.start_at(date_start)
@@ -1064,7 +1064,7 @@ def get_requests_by_user(chat_id, date_start=None, date_end=None, order_by_date=
     ref = db.reference(f"/Users/{chat_id}/Requests")
     reqs_dict = dict()
 
-    for dir in ['toBenalmadena', 'toUMA']:
+    for dir in list(dir_dict.keys()):
         query = ref.child(dir).order_by_key()
         if date_start:
             query = query.start_at(date_start)

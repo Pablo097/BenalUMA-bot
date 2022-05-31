@@ -57,8 +57,8 @@ def register_in_db(update, context, name, is_driver=False, slots=None, car=None)
     if is_driver:
         add_driver(chat_id, slots, car)
         set_fee(chat_id, MAX_FEE)
-        modify_request_notification(chat_id, 'toBenalmadena')
-        modify_request_notification(chat_id, 'toUMA')
+        for key in dir_dict:
+            modify_request_notification(chat_id, key)
 
         text = f"Te has registrado correctamente. Se te ha configurado un precio"\
                f" por trayecto de {str(MAX_FEE).replace('.',',')}€ por defecto."\
@@ -72,8 +72,8 @@ def register_in_db(update, context, name, is_driver=False, slots=None, car=None)
                f" comando /notificaciones."
         send_message(context, chat_id, text)
     else:
-        modify_offer_notification(chat_id, 'toBenalmadena')
-        modify_offer_notification(chat_id, 'toUMA')
+        for key in dir_dict:
+            modify_offer_notification(chat_id, key)
 
         text = f"Te has registrado correctamente. \n¡Ya puedes empezar a usar el bot!"
         update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())

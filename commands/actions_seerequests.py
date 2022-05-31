@@ -30,9 +30,11 @@ def see_requests(update, context):
         sent_message.edit_reply_markup(None)
 
     opt = 'DIR'
-    keyboard = [[InlineKeyboardButton("Hacia la UMA", callback_data=ccd(cdh,opt,'UMA')),
-                 InlineKeyboardButton("Hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
-    keyboard += ikbs_cancel_SR
+    row = []
+    for dir in dir_dict2:
+        row.append(InlineKeyboardButton(f"Hacia {dir_dict2[dir]}",
+                                    callback_data=ccd(cdh,opt,dir[2:5].upper())))
+    keyboard = [row] + ikbs_cancel_SR
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"Indica la dirección de las peticiones de viaje que quieres ver:"
@@ -48,10 +50,8 @@ def SR_select_date(update, context):
     if not (data[0]==cdh and data[1]=='DIR'):
         raise SyntaxError('This callback data does not belong to the SR_select_date function.')
 
-    if data[2]  == "UMA":
-        context.user_data['SR_dir'] = 'toUMA'
-    elif data[2]  == "BEN":
-        context.user_data['SR_dir'] = 'toBenalmadena'
+    if data[2] in abbr_dir_dict:
+        context.user_data['SR_dir'] = abbr_dir_dict[data[2]]
     else:
         logger.warning("Error in SR direction argument.")
         text = f"Error en opción recibida. Abortando..."
@@ -149,14 +149,20 @@ def SR_visualize(update, context):
     dir = context.user_data['SR_dir']
     date = context.user_data['SR_date']
 
-    text = f"Peticiones de viaje hacia {'la *UMA*' if dir=='toUMA' else '*Benalmádena*'}"\
-           f" el día *{date[8:10]}/{date[5:7]}*"
+    text = f"Peticiones de viaje hacia *{dir_dict2[dir]}*"\
+           f" el {get_weekday_from_date(date)} día *{date[8:10]}/{date[5:7]}*"
     if time_start:
         text += f" entre las *{time_start}* y las *{time_stop}*"
     text += f":\n\n"
     text_aux, key_list = get_formatted_requests(dir, date, time_start, time_stop)
     if text_aux:
         text += text_aux
+        if dir==list(dir_dict.keys())[0]:
+            text += f"\n\nRecuerda que, en sentido {list(dir_dict.values())[1]}"\
+                    f"→{dir_dict[dir]}, se indica la hora de llegada deseada\."
+        elif dir==list(dir_dict.keys())[1]:
+            text += f"\n\nRecuerda que, en sentido {list(dir_dict.values())[0]}"\
+                    f"→{dir_dict[dir]}, se indica la hora de salida\."
     else:
         text += "No existen peticiones de viaje en las fechas seleccionadas\."
 
@@ -201,13 +207,15 @@ def SR_end(update, context):
 
 def add_handlers(dispatcher):
     regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'
+    adl = list(abbr_dir_dict.keys())    # Abbreviated directions list
+    dir_aux = f"({adl[0]}|{adl[1]})"
 
     # Create conversation handler for 'see offers'
     SR_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('verpeticiones', see_requests)],
         states={
             SR_START: [
-                CallbackQueryHandler(SR_select_date, pattern=f"^{ccd(cdh,'DIR','(UMA|BEN)')}$"),
+                CallbackQueryHandler(SR_select_date, pattern=f"^{ccd(cdh,'DIR',dir_aux)}$"),
             ],
             SR_DATE: [
                 CallbackQueryHandler(SR_select_hour, pattern=f"^{ccd(cdh,regex_iso_date)}$"),

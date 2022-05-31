@@ -270,8 +270,8 @@ def update_user_property_callback(update, context):
         if role=='Conductor':
             add_driver(update.effective_chat.id, 3, "")
             set_fee(update.effective_chat.id, MAX_FEE)
-            modify_request_notification(update.effective_chat.id, 'toBenalmadena')
-            modify_request_notification(update.effective_chat.id, 'toUMA')
+            for key in dir_dict:
+                modify_request_notification(update.effective_chat.id, key)
             text = f"Rol cambiado a conductor correctamente."\
                    f"\n\nSe te aplicado una configuración por defecto. Por favor,"\
                    f" configura correctamente al menos tu número de asientos y"\
@@ -280,8 +280,8 @@ def update_user_property_callback(update, context):
                    f" tus preferencias sobre ello con el comando /notificaciones."
         elif role=='Pasajero':
             delete_driver_notify(update, context, update.effective_chat.id)
-            modify_offer_notification(update.effective_chat.id, 'toBenalmadena')
-            modify_offer_notification(update.effective_chat.id, 'toUMA')
+            for key in dir_dict:
+                modify_offer_notification(update.effective_chat.id, key)
             text = f"Rol cambiado a pasajero correctamente."
             text += f"\n\nSe te han activado las notificaciones sobre ofertas de"\
                     f" viajes. También se han desactivado para nuevas peticiones,"\

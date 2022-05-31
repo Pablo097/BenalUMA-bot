@@ -107,10 +107,7 @@ def cancel_booking(update, context):
     direction = data[2]
     date = data[3]
     trip_key = ';'.join(data[4:])   # Just in case the unique ID constains a ';'
-    if direction == 'Ben':
-        direction = 'toBenalmadena'
-    elif direction == 'UMA':
-        direction = 'toUMA'
+    direction = abbr_dir_dict[direction]
 
     # Save trip parameters
     context.user_data['MB_dir'] = direction

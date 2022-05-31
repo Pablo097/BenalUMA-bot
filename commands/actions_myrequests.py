@@ -103,10 +103,7 @@ def cancel_request(update, context):
     direction = data[2]
     date = data[3]
     req_key = ';'.join(data[4:])   # Just in case the unique ID constains a ';'
-    if direction == 'Ben':
-        direction = 'toBenalmadena'
-    elif direction == 'UMA':
-        direction = 'toUMA'
+    direction = abbr_dir_dict[direction]
 
     # Save request parameters
     context.user_data['MR_dir'] = direction

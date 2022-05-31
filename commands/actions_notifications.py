@@ -41,8 +41,10 @@ def offer_config_text_and_markup(chat_id, is_first=False):
     text += f"\n\nSi deseas cambiar tus preferencias, indica primero para qué dirección:"
 
     opt = "OFFERS"
-    keyboard = [[InlineKeyboardButton("Viajes hacia la UMA", callback_data=ccd(cdh,opt,'UMA'))],
-                [InlineKeyboardButton("Viajes hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
+    keyboard = []
+    for dir in dir_dict2:
+        keyboard += [[InlineKeyboardButton(f"Viajes hacia {dir_dict2[dir]}",
+                                    callback_data=ccd(cdh,opt,dir[2:5].upper()))]]
     keyboard += ikbs_end_notif
 
     return text, InlineKeyboardMarkup(keyboard)
@@ -63,8 +65,10 @@ def request_config_text_and_markup(chat_id):
             f" a nadie\. Si eso es lo que quieres hacer, elige primero la dirección:"
 
     opt = "REQUESTS"
-    keyboard = [[InlineKeyboardButton("Viajes hacia la UMA", callback_data=ccd(cdh,opt,'UMA'))],
-                [InlineKeyboardButton("Viajes hacia Benalmádena", callback_data=ccd(cdh,opt,'BEN'))]]
+    keyboard = []
+    for dir in dir_dict2:
+        keyboard += [[InlineKeyboardButton(f"Viajes hacia {dir_dict2[dir]}",
+                                    callback_data=ccd(cdh,opt,dir[2:5].upper()))]]
     keyboard += ikbs_end_notif
 
     return text, InlineKeyboardMarkup(keyboard)
@@ -123,10 +127,8 @@ def notif_config_dir(update, context):
 
     data = scd(query.data)
     if data[0]==cdh and (data[1]=="OFFERS" or data[1]=='REQUESTS'):
-        if data[2]=='BEN':
-            context.user_data['notif_dir'] = 'toBenalmadena'
-        elif data[2]=='UMA':
-            context.user_data['notif_dir'] = 'toUMA'
+        if data[2] in abbr_dir_dict:
+            context.user_data['notif_dir'] = abbr_dir_dict[data[2]]
     else:
         raise SyntaxError('This callback data does not belong to the notif_config_dir function.')
 
@@ -152,7 +154,12 @@ def notif_config_weekday(update, context):
     else:
         raise SyntaxError('This callback data does not belong to the notif_config_time function.')
 
-    text = f"Indica ahora las horas de salida de los viajes sobre los que te"\
+    text_aux = ''
+    if context.user_data['notif_dir']==list(dir_dict.keys())[0]:
+        text_aux = ' de llegada'
+    elif context.user_data['notif_dir']==list(dir_dict.keys())[1]:
+        text_aux = ' de salida'
+    text = f"Indica ahora las horas{text_aux} de los viajes sobre los que te"\
            f" interesa ser notificado:"
     opt = ccd(data[1], 'TIME')
     keyboard = [[InlineKeyboardButton("Todo el día", callback_data=ccd(cdh,opt,'ALL')),
@@ -172,11 +179,15 @@ def notif_config_time(update, context):
     query.answer()
 
     data = scd(query.data)
-    if not (data[0]==cdh and (data[1]=="OFFERS" or data[1]=='REQUESTS') and
-                data[2]=='TIME' and data[3]=='CHOOSE'):
+    if not (data[0]==cdh and data[1]=="OFFERS" and data[2]=='TIME' and data[3]=='CHOOSE'):
         raise SyntaxError('This callback data does not belong to the notif_config_time function.')
 
-    text = f"Elige cuál es la *primera hora de salida* para la que te interesa"\
+    text_aux = ''
+    if context.user_data['notif_dir']==list(dir_dict.keys())[0]:
+        text_aux = ' de llegada'
+    elif context.user_data['notif_dir']==list(dir_dict.keys())[1]:
+        text_aux = ' de salida'
+    text = f"Elige cuál es la *primera hora{text_aux}* para la que te interesa"\
            f" recibir notificaciones sobre los viajes que se publiquen:"
     opt = ccd(data[1], 'TIME', 'START')
     reply_markup = notif_time_keyboard(cdh, opt, last_hour=23, ikbs_list=ikbs_back_notif)
@@ -188,14 +199,18 @@ def notif_config_time_end(update, context):
     query.answer()
 
     data = scd(query.data)
-    if (data[0]==cdh and (data[1]=="OFFERS" or data[1]=='REQUESTS') and
-                data[2]=='TIME' and data[3]=='START'):
+    if (data[0]==cdh and data[1]=="OFFERS" and data[2]=='TIME' and data[3]=='START'):
         start_hour = int(data[4])
         context.user_data['notif_time_start'] = start_hour
     else:
         raise SyntaxError('This callback data does not belong to the notif_config_time_end function.')
 
-    text = f"Ahora elige cuál es la *última hora de salida* para la que te interesa"\
+    text_aux = ''
+    if context.user_data['notif_dir']==list(dir_dict.keys())[0]:
+        text_aux = ' de llegada'
+    elif context.user_data['notif_dir']==list(dir_dict.keys())[1]:
+        text_aux = ' de salida'
+    text = f"Ahora elige cuál es la *última hora{text_aux}* para la que te interesa"\
            f" recibir notificaciones sobre los viajes que se publiquen:"
     opt = ccd(data[1], 'TIME', 'END')
     reply_markup = notif_time_keyboard(cdh, opt, first_hour=start_hour+1, ikbs_list=ikbs_back_notif)
@@ -281,6 +296,9 @@ def notif_end(update, context):
     return ConversationHandler.END
 
 def add_handlers(dispatcher):
+    adl = list(abbr_dir_dict.keys())    # Abbreviated directions list
+    dir_aux = f"({adl[0]}|{adl[1]})"
+
     # Create conversation handler for notifications
     notifications_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('notificaciones', notif_config)],
@@ -290,7 +308,7 @@ def add_handlers(dispatcher):
                 CallbackQueryHandler(offers_config, pattern=f"^{ccd(cdh,'SELECT','OFFERS')}$")
             ],
             NOTIF_OFFERS: [
-                CallbackQueryHandler(notif_config_dir, pattern=f"^{ccd(cdh,'OFFERS','(BEN|UMA)')}$"),
+                CallbackQueryHandler(notif_config_dir, pattern=f"^{ccd(cdh,'OFFERS',dir_aux)}$"),
             ],
             NOTIF_OFFERS_CONFIGURE: [
                 CallbackQueryHandler(notif_config_weekday, pattern=f"^{ccd(cdh,'OFFERS','WD','.*')}"),
@@ -301,7 +319,7 @@ def add_handlers(dispatcher):
                 CallbackQueryHandler(offers_config, pattern=f"^NOTIF_BACK$"),
             ],
             NOTIF_REQUESTS: [
-                CallbackQueryHandler(notif_config_dir, pattern=f"^{ccd(cdh,'REQUESTS','(BEN|UMA)')}$"),
+                CallbackQueryHandler(notif_config_dir, pattern=f"^{ccd(cdh,'REQUESTS',dir_aux)}$"),
             ],
             NOTIF_REQUESTS_CONFIGURE: [
                 CallbackQueryHandler(notif_config_weekday, pattern=f"^{ccd(cdh,'REQUESTS','WD','.*')}"),
