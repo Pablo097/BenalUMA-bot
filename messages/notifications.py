@@ -44,7 +44,7 @@ def notify_new_trip(context, trip_key, direction, chat_id, date, time, slots=Non
         user_ids = list(set(user_ids)|set(req_user_ids))
 
     # Make sure that the driver doesn't get notified
-    # user_ids = list(set(user_ids)-set([str(chat_id)]))
+    user_ids = list(set(user_ids)-set([str(chat_id)]))
 
     cbd = "RSV"
     keyboard = [[InlineKeyboardButton("✅ Solicitar reserva",
