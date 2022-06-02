@@ -16,11 +16,11 @@ from messages.message_queue import send_message
 from utils.keyboards import (weekdays_keyboard, trip_ids_keyboard)
 from utils.time_picker import (time_picker_keyboard, process_time_callback)
 from utils.common import *
-from utils.decorators import registered
+from utils.decorators import registered, send_typing_action
 
 # 'See Offers' conversation points
 (SO_START, SO_DATE, SO_HOUR, SO_HOUR_SELECT_RANGE_START,
-            SO_HOUR_SELECT_RANGE_STOP, SO_VISUALIZE) = range(10,16)
+            SO_HOUR_SELECT_RANGE_STOP, SO_VISUALIZE, SO_REVIEW) = range(10,17)
 cdh = 'SO'   # Callback Data Header
 
 # Abort/Cancel buttons
@@ -115,6 +115,7 @@ def SO_select_hour_range_stop(update, context):
                                                     reply_markup=reply_markup)
     return SO_HOUR_SELECT_RANGE_STOP
 
+@send_typing_action
 def SO_visualize(update, context):
     # Check type of callback
     if update.callback_query:
@@ -126,8 +127,12 @@ def SO_visualize(update, context):
     time_start = None
     time_stop = None
 
+    # If we come from SO_review function, trip requisites are already stored
+    if (is_query and scd(query.data)[0]==cdh and scd(query.data)[1]=='CANCEL'):
+        time_start = context.user_data.get('SO_time_start')
+        time_stop = context.user_data.get('SO_time_stop')
     # Check whether we expect an stop time
-    if 'SO_time_start' in context.user_data:
+    elif 'SO_time_start' in context.user_data:
         time = process_time_callback(update, context, 'SO', ikbs_cancel_SO)
         if not time:
             return SO_HOUR_SELECT_RANGE_STOP
@@ -148,11 +153,10 @@ def SO_visualize(update, context):
                                                             reply_markup=reply_markup)
                 return SO_HOUR_SELECT_RANGE_STOP
             else:
-                time_start = context.user_data.pop('SO_time_start')
+                time_start = context.user_data['SO_time_start']
                 time_stop = time
+                context.user_data['SO_time_stop'] = time
 
-    if 'SO_message' in context.user_data:
-        del context.user_data['SO_message']
     dir = context.user_data['SO_dir']
     date = context.user_data['SO_date']
 
@@ -170,60 +174,101 @@ def SO_visualize(update, context):
         elif dir==list(dir_dict.keys())[1]:
             text += f"\n\nRecuerda que, en sentido {list(dir_dict.values())[0]}"\
                     f"→{dir_dict[dir]}, se indica la hora de salida\."
+        text += f"\n\nSi quieres reservar plaza en alguno de estos viajes, pulsa el"\
+                f" botón correspondiente a la opción deseada:"
+        reply_markup = trip_ids_keyboard(key_list, ikbs_cancel_SO)
+        next_state = SO_VISUALIZE
     else:
         text += "No existen viajes ofertados en las fechas seleccionadas\."
+        reply_markup = None
+        for key in list(context.user_data.keys()):
+            if key.startswith('SO_'):
+                del context.user_data[key]
+        next_state = ConversationHandler.END
 
     if is_query:
-        query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        query.edit_message_text(text=text, reply_markup=reply_markup,
+                                    parse_mode=telegram.ParseMode.MARKDOWN_V2)
     else:
-        update.message.reply_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        context.user_data['SO_message'] = update.message.reply_text(text=text,
+                                            reply_markup=reply_markup,
+                                            parse_mode=telegram.ParseMode.MARKDOWN_V2)
 
-    if key_list:
-        text2 = f"Si quieres reservar plaza en alguno de estos viajes, pulsa el"\
-                f" botón correspondiente a la opción deseada:"
-        context.user_data['SO_message'] = update.effective_message.reply_text(text2,
-                        reply_markup=trip_ids_keyboard(key_list, ikbs_cancel_SO))
-        return SO_VISUALIZE
+    if next_state==ConversationHandler.END and 'SO_message' in context.user_data:
+        del context.user_data['SO_message']
+
+    return next_state
+
+def SO_review(update, context):
+    query = update.callback_query
+    query.answer()
+
+    dir = context.user_data['SO_dir']
+    date = context.user_data['SO_date']
+    data = scd(query.data)
+    if data[0] != 'TRIP_ID':
+        raise SyntaxError('This callback data does not belong to the SO_review function.')
+
+    trip_key = ';'.join(data[1:])   # Just in case the unique ID constains a ';'
+    context.user_data['SO_key'] = trip_key
+
+    ok = False
+    user_id = update.effective_chat.id
+    time = get_trip_time(dir, date, trip_key)
+    if time == None:
+        text = escape_markdown(f"⚠️ Este viaje ya no existe.",2)
+    # Check that user is not the driver
+    elif user_id == get_trip_chat_id(dir, date, trip_key):
+        text = f"🚫 No puedes reservar este viaje... ¡Eres tú quien lo conduce! 😠"
+        text = escape_markdown(text,2)
+    # Check that user is not already passenger
+    elif is_passenger(user_id, dir, date, trip_key):
+        text = f"🚫 No puedes volver a reservar este viaje. Ya eres un pasajero confirmado."
+        text = escape_markdown(text,2)
+    # Check if trip hasn't ocurred yet
+    elif not is_future_datetime(date, time):
+        text = f"🚫 No puedes reservar este viaje porque la hora de salida ya"\
+               f" ha pasado. Puedes preguntarle personalmente al conductor por"\
+               f" mensaje privado pulsando sobre su nombre.\n\n"
+        text = escape_markdown(text, 2)
+        text += get_formatted_trip_for_passenger(dir, date, trip_key)
+    # Everything is ok
     else:
-        del context.user_data['SO_dir']
-        del context.user_data['SO_date']
+        ok = True
+
+    if ok:
+        text = f"Vas a enviar una solicitud de reserva para el siguiente viaje:\n\n"
+        text += get_formatted_trip_for_passenger(dir, date, trip_key)
+        text += f"\n\n¿Estás seguro?"
+        keyboard = [[InlineKeyboardButton("✅ Sí, enviar",
+                                            callback_data=ccd(cdh,'CONFIRM_RSV')),
+                     ikbs_cancel_SO[0][0]]]
+        query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard),
+                                parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        return SO_REVIEW
+    else:
+        query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        for key in list(context.user_data.keys()):
+            if key.startswith('SO_'):
+                del context.user_data[key]
         return ConversationHandler.END
 
 def SO_reserve(update, context):
     query = update.callback_query
     query.answer()
 
-    if 'SO_message' in context.user_data:
-        context.user_data.pop('SO_message')
-    dir = context.user_data.pop('SO_dir')
-    date = context.user_data.pop('SO_date')
     data = scd(query.data)
-    if data[0] != 'TRIP_ID':
+    if not (data[0]==cdh and data[1]=='CONFIRM_RSV'):
         raise SyntaxError('This callback data does not belong to the SO_reserve function.')
 
-    trip_key = ';'.join(data[1:])   # Just in case the unique ID constains a ';'
+    dir = context.user_data.pop('SO_dir')
+    date = context.user_data.pop('SO_date')
+    trip_key = context.user_data.pop('SO_key')
     user_id = update.effective_chat.id
     driver_id = get_trip_chat_id(dir, date, trip_key)
-    time = get_trip_time(dir, date, trip_key)
-
-    # Check that user is not the driver
-    if user_id == driver_id:
-        text = f"🚫 No puedes reservar este viaje... ¡Eres tú quien lo conduce! 😠"
+    if driver_id == None:
+        text = escape_markdown(f"⚠️ Este viaje ya no existe.",2)
         query.edit_message_text(text=text)
-        return ConversationHandler.END
-    # Check that user is not already passenger
-    if is_passenger(user_id, dir, date, trip_key):
-        text = f"🚫 No puedes volver a reservar este viaje. Ya eres un pasajero confirmado."
-        query.edit_message_text(text=text)
-        return ConversationHandler.END
-    # Check if trip hasn't ocurred yet
-    if not is_future_datetime(date, time):
-        text = f"🚫 No puedes reservar este viaje porque la hora de salida ya"\
-               f" ha pasado. Puedes preguntarle personalmente al conductor por"\
-               f" mensaje privado pulsando sobre su nombre.\n\n"
-        text = escape_markdown(text, 2)
-        text += get_formatted_trip_for_passenger(dir, date, trip_key)
-        query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
         return ConversationHandler.END
 
     # Send petition to driver
@@ -232,7 +277,7 @@ def SO_reserve(update, context):
     text_driver += get_formatted_trip_for_driver(dir, date, trip_key)
 
     cbd = 'ALERT'
-    driver_keyboard = [[InlineKeyboardButton("✅ Confirmar",
+    driver_keyboard = [[InlineKeyboardButton("✅ Aceptar",
                 callback_data=ccd(cbd, 'Y', user_id, dir[2:5].upper(), date, trip_key)),
                         InlineKeyboardButton("❌ Rechazar",
                 callback_data=ccd(cbd, 'N', user_id, dir[2:5].upper(), date, trip_key))]]
@@ -240,7 +285,7 @@ def SO_reserve(update, context):
         context.bot.send_message(driver_id, text_driver,
                                 reply_markup=InlineKeyboardMarkup(driver_keyboard),
                                 parse_mode=telegram.ParseMode.MARKDOWN_V2)
-        text = f"¡Hecho! Se ha enviado una petición de reserva para este viaje. 📝\n\n"
+        text = f"¡Hecho! Se ha enviado una petición de reserva para este viaje. 📨\n\n"
         text = escape_markdown(text, 2)
         text += get_formatted_trip_for_passenger(dir, date, trip_key)
         text_aux = f"\n\nAhora tienes que esperar a que el conductor decida si"\
@@ -258,6 +303,9 @@ def SO_reserve(update, context):
         text += get_formatted_trip_for_passenger(dir, date, trip_key)
 
     query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+    for key in list(context.user_data.keys()):
+        if key.startswith('SO_'):
+            del context.user_data[key]
     return ConversationHandler.END
 
 def SO_cancel(update, context):
@@ -277,7 +325,9 @@ def SO_end(update, context):
     for key in list(context.user_data.keys()):
         if key.startswith('SO_'):
             del context.user_data[key]
-    query.edit_message_text(text="Ok, no se ha pedido ninguna reserva.")
+    # query.edit_message_text(text="Ok, no se ha pedido ninguna reserva.")
+    text = query.message.text
+    query.edit_message_text(text[:text.rfind('\n')], entities=query.message.entities)
     return ConversationHandler.END
 
 def alert_user(update, context):
@@ -357,9 +407,8 @@ def alert_user(update, context):
                     send_message(context, user_id, text_booker2,
                                             telegram.ParseMode.MARKDOWN_V2)
 
-# @PABLO: This function has not been tested yet
 def reserve_from_notification(update, context):
-    """Gateway to SO_reserve when booking from a new trip notification"""
+    """Gateway to SO_review when booking from a new trip notification"""
     query = update.callback_query
     data = scd(query.data)
     if data[0] != 'RSV':
@@ -368,17 +417,26 @@ def reserve_from_notification(update, context):
     if data[1]=='DISMISS':
         query.answer()
         query.edit_message_reply_markup()
-        return
+        return ConversationHandler.END
 
-    dir, date = data[1:2]
+    dir, date = data[1:3]
     trip_key = ';'.join(data[3:])   # Just in case the unique ID constains a ';'
 
     context.user_data['SO_dir'] = abbr_dir_dict[dir]
     context.user_data['SO_date'] = date
     query.data = ccd('TRIP_ID', trip_key)
 
-    SO_reserve(update, context)
-    return
+    return SO_review(update, context)
+
+def RSV_cancel(update, context):
+    """Cancels reservation from notification conversation."""
+    query = update.callback_query
+    query.answer()
+    for key in list(context.user_data.keys()):
+        if key.startswith('SO_'):
+            del context.user_data[key]
+    query.edit_message_text(text="No se ha enviado la solicitud de reserva.")
+    return ConversationHandler.END
 
 def add_handlers(dispatcher):
     regex_iso_date = '([0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])'
@@ -408,8 +466,12 @@ def add_handlers(dispatcher):
                 MessageHandler(Filters.text & ~Filters.command, SO_visualize),
             ],
             SO_VISUALIZE: [
-                CallbackQueryHandler(SO_reserve, pattern="^TRIP_ID[^\ \n]*"),
+                CallbackQueryHandler(SO_review, pattern="^TRIP_ID[^\ \n]*"),
                 CallbackQueryHandler(SO_end, pattern=f"^{ccd(cdh,'CANCEL')}$"),
+            ],
+            SO_REVIEW: [
+                CallbackQueryHandler(SO_reserve, pattern=f"^{ccd(cdh,'CONFIRM_RSV')}$"),
+                CallbackQueryHandler(SO_visualize, pattern=f"^{ccd(cdh,'CANCEL')}$"),
             ]
         },
         fallbacks=[CallbackQueryHandler(SO_cancel, pattern=f"^{ccd(cdh,'CANCEL')}$"),
@@ -422,4 +484,11 @@ def add_handlers(dispatcher):
     dispatcher.add_handler(CallbackQueryHandler(alert_user, pattern="^ALERT.*"))
 
     # Create Callback Query handler for 'reserve from notification'
-    dispatcher.add_handler(CallbackQueryHandler(reserve_from_notification, pattern="^RSV.*"))
+    RSV_conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(reserve_from_notification, pattern="^RSV.*")],
+        states={SO_REVIEW: [
+                CallbackQueryHandler(SO_reserve, pattern=f"^{ccd(cdh,'CONFIRM_RSV')}$"),
+                ]},
+        fallbacks=[CallbackQueryHandler(RSV_cancel, pattern=f"^{ccd(cdh,'CANCEL')}$")],
+    )
+    dispatcher.add_handler(RSV_conv_handler)

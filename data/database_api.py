@@ -174,6 +174,8 @@ def delete_user(chat_id):
             delete_offer_notification(chat_id, dir)
     # Delete published requests
     delete_all_requests_by_user(chat_id)
+    # Delete all reservations
+    delete_all_reservations_from_passenger(chat_id)
     # Delete possible driver-related things
     if is_driver(chat_id):
         delete_driver(chat_id)
@@ -918,6 +920,27 @@ def remove_passenger(chat_id, direction, date, key):
         return False
 
     return True
+
+def delete_all_reservations_from_passenger(chat_id):
+    """Deletes all reservations from a user.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        chat_id of the user.
+
+    Returns
+    -------
+    None
+
+    """
+    ref = db.reference(f"/Passengers/{chat_id}")
+    trips_dict = ref.get()
+    if trips_dict:
+        for dir in trips_dict:
+            for date in trips_dict[dir]:
+                for trip_key in trips_dict[dir][date]:
+                    remove_passenger(chat_id, dir, date, trip_key)
 
 
 # Requests
