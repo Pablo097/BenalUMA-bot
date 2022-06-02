@@ -564,6 +564,24 @@ def get_trip_slots(direction, date, key):
     ref = db.reference(f"/Trips/{direction}/{date}/{key}")
     return ref.child('Slots').get()
 
+def set_trip_slots(direction, date, key, slots=None):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Slots")
+    if slots:
+        ref.set(slots)
+    else:
+        ref.delete()
+
+def get_trip_fee(direction, date, key):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}")
+    return ref.child('Fee').get()
+
+def set_trip_fee(direction, date, key, fee=None):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Fee")
+    if fee:
+        ref.set(fee)
+    else:
+        ref.delete()
+
 def get_trips_by_date_range(direction, date, time_start=None, time_end=None):
     """Gets a dictionary with the offered trips for a given date and,
     optionally, time range

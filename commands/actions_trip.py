@@ -6,7 +6,7 @@ from telegram.utils.helpers import escape_markdown
 from data.database_api import add_trip, get_fee, get_slots, get_request_time
 from messages.format import format_trip_from_data, get_formatted_trip_for_driver
 from messages.notifications import notify_new_trip
-from utils.keyboards import weekdays_keyboard
+from utils.keyboards import weekdays_keyboard, seats_keyboard
 from utils.time_picker import (time_picker_keyboard, process_time_callback)
 from utils.common import *
 from utils.decorators import registered, driver
@@ -160,15 +160,8 @@ def selecting_more(update, context):
         slots_default = get_slots(update.effective_chat.id)
 
         text_default = f"Usar asientos por defecto ({emoji_numbers[slots_default]})"
-        keyboard = [[
-                 InlineKeyboardButton(emoji_numbers[1], callback_data=ccd(cdh,"1")),
-                 InlineKeyboardButton(emoji_numbers[2], callback_data=ccd(cdh,"2")),
-                 InlineKeyboardButton(emoji_numbers[3], callback_data=ccd(cdh,"3"))],
-                [InlineKeyboardButton(emoji_numbers[4], callback_data=ccd(cdh,"4")),
-                 InlineKeyboardButton(emoji_numbers[5], callback_data=ccd(cdh,"5")),
-                 InlineKeyboardButton(emoji_numbers[6], callback_data=ccd(cdh,"6"))],
-                [InlineKeyboardButton(text_default, callback_data=ccd(cdh,'SLOTS_DEFAULT'))]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = seats_keyboard(6, cdh,
+            ikbs_list=[[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'SLOTS_DEFAULT'))]])
 
         text = "¿Cuántos asientos disponibles quieres ofertar para este viaje?"
         context.user_data['trip_setting'] = 'slots'
@@ -180,7 +173,7 @@ def selecting_more(update, context):
         keyboard = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'PRICE_DEFAULT'))]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        text = "Escribe el precio por pasajero para este trayecto (máximo 1,5€)."
+        text = f"Escribe el precio por pasajero para este trayecto (máximo {str(MAX_FEE).replace('.',',')}€)."
         context.user_data['trip_setting'] = 'price'
         next_state = TRIP_CHANGING_PRICE
 
@@ -192,12 +185,11 @@ def update_trip_setting(update, context):
     if update.callback_query:
         is_query = True
         query = update.callback_query
+        data = scd(query.data)
+        if data[0]!=cdh:
+            raise SyntaxError('This callback data does not belong to the update_trip_setting function.')
     else:
         is_query = False
-
-    data = scd(query.data)
-    if data[0]!=cdh:
-        raise SyntaxError('This callback data does not belong to the update_trip_setting function.')
 
     setting = context.user_data.pop('trip_setting', None)
     if setting == 'slots':

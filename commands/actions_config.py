@@ -9,13 +9,16 @@ from data.database_api import (is_registered, is_driver, set_name, set_car,
 from messages.format import get_formatted_user_config
 from messages.notifications import (delete_driver_notify, delete_user_notify,
                                     debug_group_notify)
-from utils.keyboards import config_keyboard
+from utils.keyboards import config_keyboard, seats_keyboard
 from utils.common import *
 from utils.decorators import registered
 
 (CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE,
     CHANGING_SLOTS, CHANGING_BIZUM, CHOOSING_ADVANCED_OPTION) = range(6)
 cdh = 'CONFIG'   # Callback Data Header
+
+# Back button
+ikbs_back_config = [[InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK"))]]
 
 logger = logging.getLogger(__name__)
 
@@ -59,18 +62,11 @@ def config_select_advanced(update, context):
     """Gives advanced options for changing the user configuration"""
     query = update.callback_query
     query.answer()
+
     role = 'Pasajero' if is_driver(update.effective_chat.id) else 'Conductor'
-    keyboard = [
-        [
-            InlineKeyboardButton(f"Cambiar rol a {role}", callback_data=ccd(cdh,"ROLE")),
-        ],
-        [
-            InlineKeyboardButton("Eliminar cuenta", callback_data=ccd(cdh,"DELETE_ACCOUNT")),
-        ],
-        [
-            InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK")),
-        ]
-    ]
+    keyboard = [[InlineKeyboardButton(f"Cambiar rol a {role}", callback_data=ccd(cdh,"ROLE"))],
+                [InlineKeyboardButton("Eliminar cuenta", callback_data=ccd(cdh,"DELETE_ACCOUNT"))]]
+    keyboard += ikbs_back_config
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     context.user_data['role'] = role
@@ -82,9 +78,8 @@ def change_name(update, context):
     """Lets user change their username"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK"))]]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(ikbs_back_config)
     text = f"⚠️ AVISO: Tu nombre y apellidos ayudan a los demás usuarios a reconocerte,"\
            f" así que deberías intentar no cambiarlos. \nSi aún así quieres cambiarlos"\
            f" (quizás porque te hubieras equivocado al registrarte), por favor,"\
@@ -98,23 +93,8 @@ def config_slots(update, context):
     """Lets driver change their predefined available slots"""
     query = update.callback_query
     query.answer()
-    keyboard = [
-        [
-            InlineKeyboardButton(emoji_numbers[1], callback_data=ccd(cdh,"1")),
-            InlineKeyboardButton(emoji_numbers[2], callback_data=ccd(cdh,"2")),
-            InlineKeyboardButton(emoji_numbers[3], callback_data=ccd(cdh,"3")),
-        ],
-        [
-            InlineKeyboardButton(emoji_numbers[4], callback_data=ccd(cdh,"4")),
-            InlineKeyboardButton(emoji_numbers[5], callback_data=ccd(cdh,"5")),
-            InlineKeyboardButton(emoji_numbers[6], callback_data=ccd(cdh,"6")),
-        ],
-        [
-            InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK")),
-        ]
-    ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = seats_keyboard(6, cdh, ikbs_list=ikbs_back_config)
     text = "¿Cuántos asientos disponibles sueles ofertar?"
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
@@ -125,16 +105,10 @@ def config_bizum(update, context):
     """Lets driver change their Bizum preference"""
     query = update.callback_query
     query.answer()
-    keyboard = [
-        [
-            InlineKeyboardButton("Sí", callback_data=ccd(cdh,"YES")),
-            InlineKeyboardButton("No", callback_data=ccd(cdh,"NO")),
-        ],
-        [
-            InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK")),
-        ]
-    ]
 
+    keyboard = [[InlineKeyboardButton("Sí", callback_data=ccd(cdh,"YES")),
+                 InlineKeyboardButton("No", callback_data=ccd(cdh,"NO"))]]
+    keyboard += ikbs_back_config
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = "Indica si aceptas Bizum como forma de pago o no."
     query.edit_message_text(text=text, reply_markup=reply_markup)
@@ -146,9 +120,8 @@ def change_car(update, context):
     """Lets driver change their car description"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK"))]]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(ikbs_back_config)
     text = "Escribe la descripción actualizada de tu coche."
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
@@ -159,10 +132,9 @@ def change_fee(update, context):
     """Lets driver change their fee"""
     query = update.callback_query
     query.answer()
-    keyboard = [[InlineKeyboardButton("↩️ Volver", callback_data=ccd(cdh,"BACK"))]]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    text = ("Escribe el precio del trayecto por pasajero (máximo 1,5€).")
+    reply_markup = InlineKeyboardMarkup(ikbs_back_config)
+    text = f"Escribe el precio del trayecto por pasajero (máximo {str(MAX_FEE).replace('.',',')}€)."
     query.edit_message_text(text=text, reply_markup=reply_markup)
 
     context.user_data['config_option'] = 'fee'
@@ -174,7 +146,7 @@ def change_role(update, context):
     query.answer()
     role = context.user_data['role']
     keyboard = [[InlineKeyboardButton("Sí", callback_data=ccd(cdh,"YES")),
-                 InlineKeyboardButton("No", callback_data=ccd(cdh,"BACK"))]]
+                 ikbs_back_config[0][0]]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"Vas a cambiar tu rol habitual a {role}."
@@ -197,7 +169,7 @@ def config_delete_account(update, context):
     query = update.callback_query
     query.answer()
     keyboard = [[InlineKeyboardButton("Sí", callback_data=ccd(cdh,"YES")),
-                 InlineKeyboardButton("No", callback_data=ccd(cdh,"BACK"))]]
+                 ikbs_back_config[0][0]]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"⚠️⚠️ Vas a eliminar tu cuenta del bot de BenalUMA. ⚠️⚠️"\
@@ -294,6 +266,8 @@ def update_user_property_callback(update, context):
         debug_text = f"El usuario con ID `{update.effective_chat.id}` ha"\
                      f" eliminado su cuenta\."
         debug_group_notify(context, debug_text, telegram.ParseMode.MARKDOWN_V2)
+        if 'config_message' in context.user_data:
+            context.user_data.pop('config_message')
         return ConversationHandler.END
 
     reply_markup = config_keyboard(update.effective_chat.id)

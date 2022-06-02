@@ -3,18 +3,20 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
-from data.database_api import (delete_trip, remove_passenger,
-                                get_trip_passengers, get_trip_time)
+from data.database_api import (delete_trip, remove_passenger, get_fee, get_slots,
+                                get_trip_passengers, get_trip_time,
+                                get_number_of_passengers, get_trip_fee,
+                                set_trip_fee, set_trip_slots)
 from messages.format import (get_markdown2_inline_mention,
                           get_formatted_trip_for_driver,
                           get_driver_week_formatted_trips)
 from messages.notifications import delete_trip_notify, remove_passenger_notify
-from utils.keyboards import trips_keyboard, passengers_keyboard
+from utils.keyboards import trips_keyboard, passengers_keyboard, seats_keyboard
 from utils.common import *
 from utils.decorators import registered, driver, send_typing_action
 
-(MYTRIPS_SELECT, MYTRIPS_EDIT, MYTRIPS_EDITING,
-            MYTRIPS_CANCEL, MYTRIPS_REJECT, MYTRIPS_EXECUTE) = range(10,16)
+(MYTRIPS_SELECT, MYTRIPS_EDIT, MYTRIPS_EDITING, MYTRIPS_CHANGING_SLOTS,
+    MYTRIPS_CHANGING_PRICE, MYTRIPS_CANCEL, MYTRIPS_REJECT, MYTRIPS_EXECUTE) = range(10,18)
 cdh = 'MT'   # Callback Data Header
 
 # Abort/Cancel buttons
@@ -41,9 +43,9 @@ def my_trips(update, context):
     if trips_dict:
         text = f"Viajes ofertados para los próximos 7 días:\n\n{formatted_trips}"
         context.user_data['MT_dict'] = trips_dict
-        keyboard = [[InlineKeyboardButton("Anular viaje", callback_data=ccd(cdh,"CANCEL"))],
+        keyboard = [[InlineKeyboardButton("Editar viaje", callback_data=ccd(cdh,"EDIT")),
+                     InlineKeyboardButton("Anular viaje", callback_data=ccd(cdh,"CANCEL"))],
                     [InlineKeyboardButton("Expulsar pasajero", callback_data=ccd(cdh,"REJECT"))]]
-                    # InlineKeyboardButton("Editar viaje", callback_data=ccd(cdh,"EDIT")),
         keyboard += ikbs_end_MT
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.user_data['MT_message'] = update.message.reply_text(text,
@@ -69,7 +71,8 @@ def my_trips_restart(update, context):
     if trips_dict:
         text = f"Viajes ofertados para los próximos 7 días:\n\n{formatted_trips}"
         context.user_data['MT_dict'] = trips_dict
-        keyboard = [[InlineKeyboardButton("Anular viaje", callback_data=ccd(cdh,"CANCEL"))],
+        keyboard = [[InlineKeyboardButton("Editar viaje", callback_data=ccd(cdh,"EDIT")),
+                     InlineKeyboardButton("Anular viaje", callback_data=ccd(cdh,"CANCEL"))],
                     [InlineKeyboardButton("Expulsar pasajero", callback_data=ccd(cdh,"REJECT"))]]
         keyboard += ikbs_end_MT
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -91,12 +94,12 @@ def choose_trip(update, context):
         raise SyntaxError('This callback data does not belong to the choose_trip function.')
 
     trips_dict = context.user_data['MT_dict']
-    # if data[1] == "EDIT":
-    #     next_state = MYTRIPS_EDIT
-    #     text = f"¿Qué viaje quieres editar?"
-    #     reply_markup = trips_keyboard(trips_dict, cdh, ikbs_back_MT,
-    #                                             show_passengers=False)
-    if data[1] == "CANCEL":
+    if data[1] == "EDIT":
+        next_state = MYTRIPS_EDIT
+        text = f"¿Qué viaje quieres editar?"
+        reply_markup = trips_keyboard(trips_dict, cdh, ikbs_back_MT,
+                                                show_passengers=False)
+    elif data[1] == "CANCEL":
         next_state = MYTRIPS_CANCEL
         text = f"¿Qué viaje quieres anular?"
         reply_markup = trips_keyboard(trips_dict, cdh, ikbs_back_MT,
@@ -124,37 +127,166 @@ def choose_trip(update, context):
     query.edit_message_text(text, reply_markup=reply_markup)
     return next_state
 
-# def edit_trip(update, context):
-#     """Gives options for changing the trip parameters"""
-#     query = update.callback_query
-#     query.answer()
-#
-#     # Parse trip identifiers
-#     data = scd(query.data)
-#     if data[0] != 'MT_ID':
-#         raise SyntaxError('This callback data does not belong to the edit_trip function.')
-#     direction = data[1]
-#     date = data[2]
-#     trip_key = ';'.join(data[3:])   # Just in case the unique ID constains a ';'
-    # direction = abbr_dir_dict[direction]
-#
-#     # Save trip parameters
-#     context.user_data['MT_dir'] = direction
-#     context.user_data['MT_date'] = date
-#     context.user_data['MT_key'] = trip_key
-#
-#     opt = 'EDIT'
-#     keyboard = [[InlineKeyboardButton("🕖 Hora", callback_data=ccd(cdh,opt,"HOUR"),
-#                  InlineKeyboardButton("💰 Precio", callback_data=ccd(cdh,opt,"PRICE")],
-#                 [InlineKeyboardButton("💺 Asientos disponibles", callback_data=ccd(cdh,opt,"SEATS")]]
-#     keyboard += ikbs_end_MT
-#     reply_markup = InlineKeyboardMarkup(keyboard)
-#
-#     text = escape_markdown(f"¿Qué parámetros quieres cambiar o añadir?\n\n",2)
-#     text += get_formatted_trip_for_driver(direction, date, trip_key)
-#     query.edit_message_text(text, reply_markup=reply_markup,
-#                             parse_mode=telegram.ParseMode.MARKDOWN_V2)
-#     return MYTRIPS_EDITING
+def edit_trip(update, context):
+    """Gives options for changing the trip parameters"""
+    query = update.callback_query
+    query.answer()
+
+    # Parse trip identifiers
+    data = scd(query.data)
+    if not (data[0]==cdh and data[1]=='ID'):
+        raise SyntaxError('This callback data does not belong to the edit_trip function.')
+    direction = data[2]
+    date = data[3]
+    trip_key = ';'.join(data[4:])   # Just in case the unique ID constains a ';'
+    direction = abbr_dir_dict[direction]
+
+    # Save trip parameters
+    context.user_data['MT_dir'] = direction
+    context.user_data['MT_date'] = date
+    context.user_data['MT_key'] = trip_key
+
+    opt = 'EDIT'
+    keyboard = [[InlineKeyboardButton("💰 Precio", callback_data=ccd(cdh,opt,"PRICE")),
+                 InlineKeyboardButton("💺 Asientos", callback_data=ccd(cdh,opt,"SLOTS"))]]
+    keyboard += ikbs_back_MT
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    text = escape_markdown(f"¿Qué parámetros quieres cambiar o añadir?\n\n",2)
+    text += get_formatted_trip_for_driver(direction, date, trip_key)
+    query.edit_message_text(text, reply_markup=reply_markup,
+                            parse_mode=telegram.ParseMode.MARKDOWN_V2)
+    return MYTRIPS_EDITING
+
+def edit_property(update, context):
+    """Gives options to change the selected property of the trip"""
+    query = update.callback_query
+    query.answer()
+
+    # Parse trip identifiers
+    data = scd(query.data)
+    if not (data[0]==cdh and data[1]=='EDIT'):
+        raise SyntaxError('This callback data does not belong to the change_trip_property function.')
+
+    dir = context.user_data['MT_dir']
+    date = context.user_data['MT_date']
+    key = context.user_data['MT_key']
+
+    if data[2] == 'SLOTS':
+        slots_default = get_slots(update.effective_chat.id)
+        num_passengers = get_number_of_passengers(dir, date, key)
+        if num_passengers > slots_default:
+            ikbs_list = None
+        else:
+            text_default = f"Usar asientos por defecto ({emoji_numbers[slots_default]})"
+            ikbs_list = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'SLOTS_DEFAULT'))]]
+
+        min_slots = max(num_passengers, 1)
+        reply_markup = seats_keyboard(6, cdh, min_slots, ikbs_list=ikbs_list)
+
+        text = f"¿Cuántos asientos disponibles quieres ofertar para este viaje?"\
+               f"\n(Sólo puedes modificar los asientos para que haya igual o más"\
+               " que el número de pasajeros que ya tengas aceptados)"
+        context.user_data['MT_edit_option'] = 'slots'
+        next_state = MYTRIPS_CHANGING_SLOTS
+    elif data[2] == 'PRICE':
+        user_fee = get_fee(update.effective_chat.id)
+        num_passengers = get_number_of_passengers(dir, date, key)
+        text = f"Escribe el nuevo precio por pasajero para este trayecto"
+        # If passengers already in trip, fee can't be risen from the current value
+        if num_passengers>0:
+            trip_fee = get_trip_fee(dir, date, key)
+            max_fee = trip_fee if trip_fee!=None else user_fee
+            text += f". Como ya tienes pasajeros reservados, no puedes subir"\
+                    f" el precio del que ya tenías configurado ("
+        else:
+            trip_fee = None
+            max_fee = MAX_FEE
+            text += f" (máximo "
+        text += f"{str(max_fee).replace('.',',')}€)."
+        # Only give option to go back to default fee if there is no trip fee or
+        # it is higher than the default user value
+        if not trip_fee or (trip_fee and trip_fee >= user_fee):
+            price_default = str(user_fee).replace('.',',')
+            text_default = f"Usar precio por defecto ({price_default}€)"
+            keyboard = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'PRICE_DEFAULT'))]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+        else:
+            reply_markup = None
+
+        context.user_data['MT_edit_option'] = 'price'
+        context.user_data['MT_max_fee'] = max_fee
+        next_state = MYTRIPS_CHANGING_PRICE
+
+    context.user_data['MT_message'] = query.edit_message_text(text, reply_markup=reply_markup)
+    return next_state
+
+def update_trip_property(update, context):
+    # Check if update is callback query or new message
+    if update.callback_query:
+        is_query = True
+        query = update.callback_query
+        data = scd(query.data)
+        if data[0]!=cdh:
+            raise SyntaxError('This callback data does not belong to the update_trip_property function.')
+    else:
+        is_query = False
+
+    # Obtain trip parameters
+    direction = context.user_data['MT_dir']
+    date = context.user_data['MT_date']
+    trip_key = context.user_data['MT_key']
+    option = context.user_data.pop('MT_edit_option', None)
+
+    if option == 'slots':
+        if data[1] == "SLOTS_DEFAULT":
+            set_trip_slots(direction, date, trip_key)
+        else:
+            set_trip_slots(direction, date, trip_key, int(data[1]))
+    elif option == 'price':
+        max_fee = context.user_data['MT_max_fee']
+        if not is_query:
+            reply_markup = None
+            # Remove possible inline keyboard from previous message
+            if 'MT_message' in context.user_data:
+                sent_message = context.user_data.pop('MT_message')
+                if sent_message.reply_markup:
+                    sent_message.edit_reply_markup(None)
+                    reply_markup = sent_message.reply_markup
+            # Obtain price
+            try:
+                price = obtain_float_from_string(update.message.text)
+            except:
+                price = -1
+            if not (price>=0 and price<=max_fee):
+                text = f"Por favor, introduce un número entre 0 y {str(max_fee).replace('.',',')}."
+                context.user_data['MT_message'] = update.message.reply_text(text,
+                                                        reply_markup=reply_markup)
+                context.user_data['MT_edit_option'] = 'price'
+                return MYTRIPS_CHANGING_PRICE
+            else:
+                set_trip_fee(direction, date, trip_key, price)
+        elif data[1] == "PRICE_DEFAULT":
+            set_trip_fee(direction, date, trip_key)
+
+    opt = 'EDIT'
+    keyboard = [[InlineKeyboardButton("💰 Precio", callback_data=ccd(cdh,opt,"PRICE")),
+                 InlineKeyboardButton("💺 Asientos", callback_data=ccd(cdh,opt,"SLOTS"))]]
+    keyboard += ikbs_back_MT
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    text = f"Los parámetros de tu viaje han sido cambiados correctamente."\
+           f" ¿Quieres cambiar algo más?\n\n"
+    text = escape_markdown(text,2)
+    text += get_formatted_trip_for_driver(direction, date, trip_key)
+    if is_query:
+        query.edit_message_text(text, reply_markup=reply_markup,
+                            parse_mode=telegram.ParseMode.MARKDOWN_V2)
+    else:
+        context.user_data['MT_message'] = update.message.reply_text(text,
+                                            reply_markup=reply_markup,
+                                            parse_mode=telegram.ParseMode.MARKDOWN_V2)
+    return MYTRIPS_EDITING
 
 def cancel_trip(update, context):
     """Cancels the given trip"""
@@ -226,19 +358,6 @@ def reject_passenger(update, context):
                             parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return MYTRIPS_EXECUTE
 
-# def change_trip_property(update, context):
-#     """Changes the selected property of the trip"""
-#     query = update.callback_query
-#     query.answer()
-#     # option = context.user_data.pop('MT_edit_option')
-#
-#     for key in list(context.user_data.keys()):
-#         if key.startswith('MT_'):
-#             del context.user_data[key]
-#     text = f"Ups, esta función aún no está implementada. ¡Perdón por las molestias!"
-#     query.edit_message_text(text)
-#     return ConversationHandler.END
-
 def MT_execute_action(update, context):
     query = update.callback_query
     query.answer()
@@ -290,12 +409,20 @@ def add_handlers(dispatcher):
             MYTRIPS_SELECT: [
                 CallbackQueryHandler(choose_trip, pattern=f"^{ccd(cdh,'(EDIT|CANCEL|REJECT)')}$")
             ],
-            # MYTRIPS_EDIT: [
-            #     CallbackQueryHandler(edit_trip, pattern=f"^{ccd(cdh,'ID','.*')}")
-            # ],
-            # MYTRIPS_EDITING: [
-            #     CallbackQueryHandler(change_trip_property, pattern=f"^{ccd(cdh,'EDIT','(HOUR|PRICE|SEATS)')}$")
-            # ],
+            MYTRIPS_EDIT: [
+                CallbackQueryHandler(edit_trip, pattern=f"^{ccd(cdh,'ID','.*')}")
+            ],
+            MYTRIPS_EDITING: [
+                CallbackQueryHandler(edit_property, pattern=f"^{ccd(cdh,'EDIT','(PRICE|SLOTS)')}$")
+            ],
+            MYTRIPS_CHANGING_SLOTS: [
+                CallbackQueryHandler(update_trip_property, pattern=f"^{ccd(cdh,'(1|2|3|4|5|6)')}$"),
+                CallbackQueryHandler(update_trip_property, pattern=f"^{ccd(cdh,'SLOTS_DEFAULT')}$"),
+            ],
+            MYTRIPS_CHANGING_PRICE: [
+                CallbackQueryHandler(update_trip_property, pattern=f"^{ccd(cdh,'PRICE_DEFAULT')}$"),
+                MessageHandler(Filters.text & ~Filters.command, update_trip_property),
+            ],
             MYTRIPS_CANCEL: [
                 CallbackQueryHandler(cancel_trip, pattern=f"^{ccd(cdh,'ID','.*')}")
             ],

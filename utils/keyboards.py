@@ -2,8 +2,7 @@ import logging, math
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from data.database_api import is_driver, get_name
 from messages.format import format_trip_from_data, format_request_from_data
-from utils.common import (weekdays, weekdays_en, weekdays_from_today,
-                            week_isoformats, ccd, scd)
+from utils.common import *
 
 def config_keyboard(chat_id):
     """Creates an inline keyboard with the user configuration options.
@@ -36,6 +35,49 @@ def config_keyboard(chat_id):
         ]
     keyboard += [[InlineKeyboardButton("Configuración avanzada", callback_data=ccd(cdh,"ADVANCED"))],
                  [InlineKeyboardButton("Terminar", callback_data=ccd(cdh,"END"))]]
+    return InlineKeyboardMarkup(keyboard)
+
+def seats_keyboard(max_seats, cdh, min_seats=1, ikbs_list=None):
+    """Creates an inline keyboard with numbered buttons that return the number
+    of seats
+
+    Parameters
+    ----------
+    max_seats : int
+        Maximum number of seats to display
+    cdh : string
+        Callback Data Header: Word to add at the beginning of each of the
+        callback datas for better identification.
+    min_seats : int
+        Minimum number of seats to display
+    ikbs_list : List[List[telegram.InlineKeyboardButton]]
+        If not None, the buttons in this list will be added at the bottom of
+        the inline keyboard.
+
+    Returns
+    -------
+    InlineKeyboardMarkup
+        The keyboard whose callback datas are the numbers.
+
+    """
+    num_seats = max_seats-min_seats+1
+    n_rows = math.ceil(num_seats/3)
+    n_cols = math.ceil(num_seats/n_rows)
+    index = min_seats
+    keyboard = []
+    for i in range(n_rows):
+        row = []
+        for j in range(n_cols):
+            # If no more items, dont try to append more to row
+            if index>max_seats:
+                continue
+            row.append(InlineKeyboardButton(emoji_numbers[index],
+                                            callback_data=ccd(cdh,str(index))))
+            index += 1
+        keyboard.append(row)
+
+    if ikbs_list:
+        keyboard += ikbs_list
     return InlineKeyboardMarkup(keyboard)
 
 def weekdays_keyboard(cdh, ikbs_list=None):
