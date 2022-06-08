@@ -4,12 +4,15 @@ from datetime import datetime, date, timedelta, time
 from pytz import timezone
 
 MAX_FEE = 1.5
+MAX_LOC_CHARS = 20
 
 # Dictionaries for generalizing the code and making it prettier
 dir_dict = {'toUMA': 'UMA', 'toBenalmadena':'Benalmádena'}
 dir_dict2 = dict(dir_dict.items())
 dir_dict2[list(dir_dict.keys())[0]] = 'la '+dir_dict2[list(dir_dict.keys())[0]]
 abbr_dir_dict = {key[2:5].upper():key for (key,value) in dir_dict.items()}
+home_examples_list = ['Arroyo', 'Pueblo', 'Costa']
+univ_examples_list = ['Derecho', 'Teleco', 'Ampliación']
 
 emoji_numbers = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']

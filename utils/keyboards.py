@@ -24,6 +24,7 @@ def config_keyboard(chat_id):
         ]
     ]
     if is_driver(chat_id):
+        univ, home = list(dir_dict.values())
         keyboard += [
             [
                 InlineKeyboardButton("Asientos libres", callback_data=ccd(cdh,"SLOTS")),
@@ -31,6 +32,9 @@ def config_keyboard(chat_id):
             ], [
                 InlineKeyboardButton("Descripción vehículo", callback_data=ccd(cdh,"CAR")),
                 InlineKeyboardButton("Establecer precio", callback_data=ccd(cdh,"FEE")),
+            ], [
+                InlineKeyboardButton(f"Zona {home}", callback_data=ccd(cdh,"HOME")),
+                InlineKeyboardButton(f"Zona {univ}", callback_data=ccd(cdh,"UNIV")),
             ]
         ]
     keyboard += [[InlineKeyboardButton("Configuración avanzada", callback_data=ccd(cdh,"ADVANCED"))],

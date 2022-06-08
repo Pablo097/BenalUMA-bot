@@ -13,8 +13,8 @@ from utils.keyboards import config_keyboard, seats_keyboard
 from utils.common import *
 from utils.decorators import registered
 
-(CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE,
-    CHANGING_SLOTS, CHANGING_BIZUM, CHOOSING_ADVANCED_OPTION) = range(6)
+(CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE, CHANGING_SLOTS,
+    CHANGING_BIZUM, CHANGING_LOCATION, CHOOSING_ADVANCED_OPTION) = range(7)
 cdh = 'CONFIG'   # Callback Data Header
 
 # Back button
@@ -140,6 +140,44 @@ def change_fee(update, context):
     context.user_data['config_option'] = 'fee'
     return CHANGING_MESSAGE
 
+def change_home(update, context):
+    """Lets driver change their home location description"""
+    query = update.callback_query
+    query.answer()
+
+    keyboard = [[InlineKeyboardButton("Borrar", callback_data=ccd(cdh,"DELETE")),
+                 ikbs_back_config[0][0]]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    home = list(dir_dict2.values())[1]
+    text = f"Escribe una breve descripción de la zona de {home} de la que sales,"\
+           f" para facilitar a los usuarios conocer a priori la zona por la que"\
+           f" podrías recogerlos/dejarlos.\n"\
+           f"Por ejemplo: {', '.join(home_examples_list)}, etc."\
+           f" (Máximo {MAX_LOC_CHARS} caracteres)"
+    query.edit_message_text(text=text, reply_markup=reply_markup)
+
+    context.user_data['config_option'] = 'home'
+    return CHANGING_LOCATION
+
+def change_univ(update, context):
+    """Lets driver change their university location description"""
+    query = update.callback_query
+    query.answer()
+
+    keyboard = [[InlineKeyboardButton("Borrar", callback_data=ccd(cdh,"DELETE")),
+                 ikbs_back_config[0][0]]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    univ = list(dir_dict2.values())[0]
+    text = f"Escribe una breve descripción de la zona de {univ} a la que sueles"\
+           f" ir, para facilitar a los usuarios conocer a priori la zona por la"\
+           f" que podrías recogerlos/dejarlos.\n"
+           f"Por ejemplo: {', '.join(univ_examples_list)}, etc."\
+           f" (Máximo {MAX_LOC_CHARS} caracteres)"
+    query.edit_message_text(text=text, reply_markup=reply_markup)
+
+    context.user_data['config_option'] = 'univ'
+    return CHANGING_LOCATION
+
 def change_role(update, context):
     """Lets driver change their role"""
     query = update.callback_query
@@ -205,6 +243,14 @@ def update_user_property(update, context):
         else:
             set_fee(update.effective_chat.id, fee)
             text = f"Precio del trayecto actualizado a {str(fee).replace('.',',')}€."
+    elif option == 'home':
+        home = update.message.text[0].upper()+update.message.text[1:]
+        set_home(update.effective_chat.id, home)
+        text = f"Descripción de tu zona de {list(dir_dict2.values())[1]} actualizada."
+    elif option == 'univ':
+        univ = update.message.text[0].upper()+update.message.text[1:]
+        set_univ(update.effective_chat.id, univ)
+        text = f"Descripción de tu zona de {list(dir_dict2.values())[0]} actualizada."
 
     # Remove possible inline keyboard from previous message
     if 'config_message' in context.user_data:
@@ -237,6 +283,14 @@ def update_user_property_callback(update, context):
         bizum_flag = True if data[1]=="YES" else False
         set_bizum(update.effective_chat.id, bizum_flag)
         text = f"Preferencia de Bizum modificada correctamente."
+    elif option == 'home':
+        if data[1] == 'DELETE':
+            set_home(update.effective_chat.id)
+            text = f"Descripción de tu zona de {list(dir_dict2.values())[1]} borrada."
+    elif option == 'univ':
+        if data[1] == 'DELETE':
+            set_univ(update.effective_chat.id)
+            text = f"Descripción de tu zona de {list(dir_dict2.values())[0]} borrada."
     elif option == 'role':
         role = context.user_data.pop('role')
         if role=='Conductor':
@@ -319,6 +373,10 @@ def add_handlers(dispatcher):
             CHANGING_BIZUM: [
                 CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'(YES|NO)')}$")
             ],
+            CHANGING_LOCATION: [
+                CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'DELETE')}$"),
+                MessageHandler(Filter.regex('^.{1,'+str(MAX_LOC_CHARS)+'}'), update_user_property),
+            ]
             CHOOSING_ADVANCED_OPTION: [
                 CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'YES')}$")
             ]

@@ -46,7 +46,14 @@ def get_formatted_user_config(chat_id):
         # elif bizum == False:
         #     string += f"\n💳🚫 `NO aceptas Bizum`"
         if bizum != None:
-            string +=f"\n💳 *Bizum*: `{'P' if bizum else '🚫 NO p'}ermitido`"
+            string += f"\n💳 *Bizum*: `{'P' if bizum else '🚫 NO p'}ermitido`"
+        univ_name, home_name = list(dir_dict.values())
+        home = get_home(chat_id)
+        if home != None:
+            string += f"\n🏠 *Zona {home_name}*: `{escape_markdown(home,2)}`"
+        univ = get_univ(chat_id)
+        if univ != None:
+            string += f"\n🏢 *Zona {univ_name}*: `{escape_markdown(univ,2)}`"
 
     return string
 

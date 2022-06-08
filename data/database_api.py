@@ -457,10 +457,92 @@ def set_bizum(chat_id, bizum_pref):
     else:
         ref.update({"Bizum": "No"})
 
+def get_home(chat_id):
+    """Gets the description of the location from where the driver usually
+    starts their trips in the home town.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id to check.
+
+    Returns
+    -------
+    str
+        Description of the home's location.
+
+    """
+
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
+    return ref.child('Home').get()
+
+def set_home(chat_id, home=None):
+    """Sets the description of the location from where the driver usually
+    starts their trips in the home town.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id of the driver.
+    home : str
+        Description of the home's location. If None, this field is deleted.
+
+    Returns
+    -------
+    None
+
+    """
+    ref = db.reference(f"/Drivers/{str(chat_id)}/Home")
+    if home:
+        ref.set(home)
+    else:
+        ref.delete()
+
+def get_univ(chat_id):
+    """Gets the description of the location to where the driver usually
+    goes in the university campus.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id to check.
+
+    Returns
+    -------
+    str
+        Description of the university's location.
+
+    """
+
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
+    return ref.child('Univ').get()
+
+def set_univ(chat_id, univ=None):
+    """Sets the description of the location to where the driver usually
+    goes in the university campus.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id of the driver.
+    univ : str
+        Description of the university's location. If None, this field is deleted.
+
+    Returns
+    -------
+    None
+
+    """
+    ref = db.reference(f"/Drivers/{str(chat_id)}/Univ")
+    if univ:
+        ref.set(univ)
+    else:
+        ref.delete()
 
 # Trips
 
-def add_trip(direction, chat_id, date, time, slots = None, fee = None):
+def add_trip(direction, chat_id, date, time, slots=None, fee=None,
+                    origin=None, dest=None):
     """Creates new trip with given information.
 
     Parameters
@@ -477,6 +559,10 @@ def add_trip(direction, chat_id, date, time, slots = None, fee = None):
         Optional. Number of available slots for this specific trip.
     fee : float
         Optional. The per-user payment quantity.
+    origin : str
+        Optional. Brief description of origin location.
+    dest : str
+        Optional. Brief description of destination location.
 
     Returns
     -------
@@ -497,6 +583,12 @@ def add_trip(direction, chat_id, date, time, slots = None, fee = None):
 
     if fee != None:
         trip_dict['Fee'] = fee
+
+    if origin != None:
+        trip_dict['Origin'] = origin
+
+    if dest != None:
+        trip_dict['Dest'] = dest
 
     key = ref.push(trip_dict).key
 
@@ -579,6 +671,28 @@ def set_trip_fee(direction, date, key, fee=None):
     ref = db.reference(f"/Trips/{direction}/{date}/{key}/Fee")
     if fee:
         ref.set(fee)
+    else:
+        ref.delete()
+
+def get_trip_origin(direction, date, key):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}")
+    return ref.child('Origin').get()
+
+def set_trip_origin(direction, date, key, origin=None):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Origin")
+    if origin:
+        ref.set(origin)
+    else:
+        ref.delete()
+
+def get_trip_destination(direction, date, key):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}")
+    return ref.child('Dest').get()
+
+def set_trip_destination(direction, date, key, dest=None):
+    ref = db.reference(f"/Trips/{direction}/{date}/{key}/Dest")
+    if dest:
+        ref.set(dest)
     else:
         ref.delete()
 
