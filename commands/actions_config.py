@@ -5,6 +5,7 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
 from telegram.utils.helpers import escape_markdown
 from data.database_api import (is_registered, is_driver, set_name, set_car,
                                 set_slots, set_bizum, set_fee, add_driver,
+                                set_home, set_univ,
                                 modify_offer_notification, modify_request_notification)
 from messages.format import get_formatted_user_config
 from messages.notifications import (delete_driver_notify, delete_user_notify,
@@ -151,10 +152,11 @@ def change_home(update, context):
     home = list(dir_dict2.values())[1]
     text = f"Escribe una breve descripción de la zona de {home} de la que sales,"\
            f" para facilitar a los usuarios conocer a priori la zona por la que"\
-           f" podrías recogerlos/dejarlos.\n"\
-           f"Por ejemplo: {', '.join(home_examples_list)}, etc."\
-           f" (Máximo {MAX_LOC_CHARS} caracteres)"
-    query.edit_message_text(text=text, reply_markup=reply_markup)
+           f" podrías recogerlos/dejarlos\.\nPor ejemplo:"\
+           f" `{'`, `'.join([escape_markdown(aux,2) for aux in home_examples_list])}`"\
+           f", etc\. \(Máximo {MAX_LOC_CHARS} caracteres\)"
+    query.edit_message_text(text=text, reply_markup=reply_markup,
+                                parse_mode=telegram.ParseMode.MARKDOWN_V2)
 
     context.user_data['config_option'] = 'home'
     return CHANGING_LOCATION
@@ -170,10 +172,11 @@ def change_univ(update, context):
     univ = list(dir_dict2.values())[0]
     text = f"Escribe una breve descripción de la zona de {univ} a la que sueles"\
            f" ir, para facilitar a los usuarios conocer a priori la zona por la"\
-           f" que podrías recogerlos/dejarlos.\n"
-           f"Por ejemplo: {', '.join(univ_examples_list)}, etc."\
-           f" (Máximo {MAX_LOC_CHARS} caracteres)"
-    query.edit_message_text(text=text, reply_markup=reply_markup)
+           f" que podrías recogerlos/dejarlos\.\nPor ejemplo:"\
+           f" `{'`, `'.join([escape_markdown(aux,2) for aux in univ_examples_list])}`"\
+           f", etc\. \(Máximo {MAX_LOC_CHARS} caracteres\)"
+    query.edit_message_text(text=text, reply_markup=reply_markup,
+                                parse_mode=telegram.ParseMode.MARKDOWN_V2)
 
     context.user_data['config_option'] = 'univ'
     return CHANGING_LOCATION
@@ -244,11 +247,11 @@ def update_user_property(update, context):
             set_fee(update.effective_chat.id, fee)
             text = f"Precio del trayecto actualizado a {str(fee).replace('.',',')}€."
     elif option == 'home':
-        home = update.message.text[0].upper()+update.message.text[1:]
+        home = update.message.text[:20].capitalize()
         set_home(update.effective_chat.id, home)
         text = f"Descripción de tu zona de {list(dir_dict2.values())[1]} actualizada."
     elif option == 'univ':
-        univ = update.message.text[0].upper()+update.message.text[1:]
+        univ = update.message.text[:20].capitalize()
         set_univ(update.effective_chat.id, univ)
         text = f"Descripción de tu zona de {list(dir_dict2.values())[0]} actualizada."
 
@@ -356,6 +359,8 @@ def add_handlers(dispatcher):
                 CallbackQueryHandler(config_slots, pattern=f"^{ccd(cdh,'SLOTS')}$"),
                 CallbackQueryHandler(config_bizum, pattern=f"^{ccd(cdh,'BIZUM')}$"),
                 CallbackQueryHandler(change_car, pattern=f"^{ccd(cdh,'CAR')}$"),
+                CallbackQueryHandler(change_home, pattern=f"^{ccd(cdh,'HOME')}$"),
+                CallbackQueryHandler(change_univ, pattern=f"^{ccd(cdh,'UNIV')}$"),
                 CallbackQueryHandler(change_fee, pattern=f"^{ccd(cdh,'FEE')}$"),
                 CallbackQueryHandler(config_end, pattern=f"^{ccd(cdh,'END')}$"),
                 CallbackQueryHandler(config_select_advanced, pattern=f"^{ccd(cdh,'ADVANCED')}$"),
@@ -375,8 +380,8 @@ def add_handlers(dispatcher):
             ],
             CHANGING_LOCATION: [
                 CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'DELETE')}$"),
-                MessageHandler(Filter.regex('^.{1,'+str(MAX_LOC_CHARS)+'}'), update_user_property),
-            ]
+                MessageHandler(Filters.text & ~Filters.command, update_user_property),
+            ],
             CHOOSING_ADVANCED_OPTION: [
                 CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'YES')}$")
             ]

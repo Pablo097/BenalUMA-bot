@@ -6,7 +6,9 @@ from telegram.utils.helpers import escape_markdown
 from data.database_api import (delete_trip, remove_passenger, get_fee, get_slots,
                                 get_trip_passengers, get_trip_time,
                                 get_number_of_passengers, get_trip_fee,
-                                set_trip_fee, set_trip_slots)
+                                set_trip_fee, set_trip_slots,
+                                get_home, get_univ,
+                                set_trip_origin, set_trip_destination)
 from messages.format import (get_markdown2_inline_mention,
                           get_formatted_trip_for_driver,
                           get_driver_week_formatted_trips)
@@ -16,7 +18,8 @@ from utils.common import *
 from utils.decorators import registered, driver, send_typing_action
 
 (MYTRIPS_SELECT, MYTRIPS_EDIT, MYTRIPS_EDITING, MYTRIPS_CHANGING_SLOTS,
-    MYTRIPS_CHANGING_PRICE, MYTRIPS_CANCEL, MYTRIPS_REJECT, MYTRIPS_EXECUTE) = range(10,18)
+    MYTRIPS_CHANGING_PRICE, MYTRIPS_CHANGING_ORIGIN, MYTRIPS_CHANGING_DEST,
+    MYTRIPS_CANCEL, MYTRIPS_REJECT, MYTRIPS_EXECUTE) = range(10,20)
 cdh = 'MT'   # Callback Data Header
 
 # Abort/Cancel buttons
@@ -146,14 +149,22 @@ def edit_trip(update, context):
     context.user_data['MT_date'] = date
     context.user_data['MT_key'] = trip_key
 
-    opt = 'EDIT'
-    keyboard = [[InlineKeyboardButton("💰 Precio", callback_data=ccd(cdh,opt,"PRICE")),
-                 InlineKeyboardButton("💺 Asientos", callback_data=ccd(cdh,opt,"SLOTS"))]]
-    keyboard += ikbs_back_MT
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # Check if trip hasn't ocurred yet
+    time = get_trip_time(direction, date, trip_key)
+    if not is_future_datetime(date, time, 15):
+        reply_markup = InlineKeyboardMarkup(ikbs_back_MT)
+        text = f"🚫 No puedes editar este viaje porque ya ha pasado\."
+    else:
+        opt = 'EDIT'
+        keyboard = [[InlineKeyboardButton("💰 Precio", callback_data=ccd(cdh,opt,"PRICE")),
+                     InlineKeyboardButton("💺 Asientos", callback_data=ccd(cdh,opt,"SLOTS"))],
+                    [InlineKeyboardButton("🚏 Origen", callback_data=ccd(cdh,opt,"ORIGIN")),
+                     InlineKeyboardButton("🏁 Destino", callback_data=ccd(cdh,opt,"DEST"))]]
+        keyboard += ikbs_back_MT
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = escape_markdown(f"¿Qué parámetros quieres cambiar o añadir?\n\n",2)
-    text += get_formatted_trip_for_driver(direction, date, trip_key)
+        text = escape_markdown(f"¿Qué parámetros quieres cambiar o añadir?\n\n",2)
+        text += get_formatted_trip_for_driver(direction, date, trip_key)
     query.edit_message_text(text, reply_markup=reply_markup,
                             parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return MYTRIPS_EDITING
@@ -187,6 +198,7 @@ def edit_property(update, context):
         text = f"¿Cuántos asientos disponibles quieres ofertar para este viaje?"\
                f"\n(Sólo puedes modificar los asientos para que haya igual o más"\
                " que el número de pasajeros que ya tengas aceptados)"
+        text = escape_markdown(text,2)
         context.user_data['MT_edit_option'] = 'slots'
         next_state = MYTRIPS_CHANGING_SLOTS
     elif data[2] == 'PRICE':
@@ -204,6 +216,7 @@ def edit_property(update, context):
             max_fee = MAX_FEE
             text += f" (máximo "
         text += f"{str(max_fee).replace('.',',')}€)."
+        text = escape_markdown(text,2)
         # Only give option to go back to default fee if there is no trip fee or
         # it is higher than the default user value
         if not trip_fee or (trip_fee and trip_fee >= user_fee):
@@ -217,8 +230,60 @@ def edit_property(update, context):
         context.user_data['MT_edit_option'] = 'price'
         context.user_data['MT_max_fee'] = max_fee
         next_state = MYTRIPS_CHANGING_PRICE
+    elif data[2] == 'ORIGIN':
+        if dir==list(dir_dict.keys())[0]:       # University
+            origin = get_home(update.effective_chat.id)
+            eg_list = home_examples_list
+            dir_str = dir_dict2[list(dir_dict.keys())[1]]
+        elif dir==list(dir_dict.keys())[1]:     # Home
+            origin = get_univ(update.effective_chat.id)
+            eg_list = univ_examples_list
+            dir_str = dir_dict2[list(dir_dict.keys())[0]]
 
-    context.user_data['MT_message'] = query.edit_message_text(text, reply_markup=reply_markup)
+        text = f"Escribe una breve descripción de la *zona de la que vas a salir*\."\
+               f" Por ejemplo: `{'`, `'.join([escape_markdown(aux,2) for aux in eg_list])}`"\
+               f", etc\. \(Máximo {MAX_LOC_CHARS} caracteres\)"
+        # If origin has a default value, give option to use it
+        if origin:
+            text_default = f"Usar origen por defecto ({escape_markdown(origin,2)})"
+            keyboard = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'ORIGIN_DEFAULT'))]]
+        else:
+            text += f"\n\nRecuerda que puedes configurar una zona de {dir_str} por"\
+                    f" defecto desde el comando /config, que los usuarios verán"\
+                    f" en todos tus viajes para los que no hayas concretado una distinta\."
+            keyboard = [[InlineKeyboardButton("Borrar", callback_data=ccd(cdh,'ORIGIN_DELETE'))]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.user_data['MT_edit_option'] = 'origin'
+        next_state = MYTRIPS_CHANGING_ORIGIN
+    elif data[2] == 'DEST':
+        dir_str = dir_dict2[dir]
+        if dir==list(dir_dict.keys())[0]:       # University
+            dest = get_univ(update.effective_chat.id)
+            eg_list = univ_examples_list
+        elif dir==list(dir_dict.keys())[1]:     # Home
+            dest = get_home(update.effective_chat.id)
+            eg_list = home_examples_list
+
+        text = f"Escribe una breve descripción de la *zona a la que vas a ir*\."\
+               f" Por ejemplo: `{'`, `'.join([escape_markdown(aux,2) for aux in eg_list])}`"\
+               f", etc\. \(Máximo {MAX_LOC_CHARS} caracteres\)"
+        # If destination has a default value, give option to use it
+        if dest:
+            text_default = f"Usar destino por defecto ({escape_markdown(dest,2)})"
+            keyboard = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'DEST_DEFAULT'))]]
+        else:
+            text += f"\n\nRecuerda que puedes configurar una zona de {dir_str} por"\
+                    f" defecto desde el comando /config, que los usuarios verán"\
+                    f" en todos tus viajes para los que no hayas concretado una distinta\."
+            keyboard = [[InlineKeyboardButton("Borrar", callback_data=ccd(cdh,'DEST_DELETE'))]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.user_data['MT_edit_option'] = 'dest'
+        next_state = MYTRIPS_CHANGING_DEST
+
+    context.user_data['MT_message'] = query.edit_message_text(text,
+                reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return next_state
 
 def update_trip_property(update, context):
@@ -268,10 +333,34 @@ def update_trip_property(update, context):
                 set_trip_fee(direction, date, trip_key, price)
         elif data[1] == "PRICE_DEFAULT":
             set_trip_fee(direction, date, trip_key)
+    elif option == 'origin':
+        if not is_query:
+            # Remove possible inline keyboard from previous message
+            if 'MT_message' in context.user_data:
+                sent_message = context.user_data.pop('MT_message')
+                sent_message.edit_reply_markup(None)
+            # Obtain origin, limiting characters
+            origin = update.message.text[:20].capitalize()
+            set_trip_origin(direction, date, trip_key, origin)
+        elif data[1] == "ORIGIN_DEFAULT" or data[1] == "ORIGIN_DELETE":
+            set_trip_origin(direction, date, trip_key)
+    elif option == 'dest':
+        if not is_query:
+            # Remove possible inline keyboard from previous message
+            if 'MT_message' in context.user_data:
+                sent_message = context.user_data.pop('MT_message')
+                sent_message.edit_reply_markup(None)
+            # Obtain destination, limiting characters
+            dest = update.message.text[:20].capitalize()
+            set_trip_destination(direction, date, trip_key, dest)
+        elif data[1] == "DEST_DEFAULT" or data[1] == "DEST_DELETE":
+            set_trip_destination(direction, date, trip_key)
 
     opt = 'EDIT'
     keyboard = [[InlineKeyboardButton("💰 Precio", callback_data=ccd(cdh,opt,"PRICE")),
-                 InlineKeyboardButton("💺 Asientos", callback_data=ccd(cdh,opt,"SLOTS"))]]
+                 InlineKeyboardButton("💺 Asientos", callback_data=ccd(cdh,opt,"SLOTS"))],
+                [InlineKeyboardButton("🚏 Origen", callback_data=ccd(cdh,opt,"ORIGIN")),
+                 InlineKeyboardButton("🏁 Destino", callback_data=ccd(cdh,opt,"DEST"))]]
     keyboard += ikbs_back_MT
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -413,7 +502,7 @@ def add_handlers(dispatcher):
                 CallbackQueryHandler(edit_trip, pattern=f"^{ccd(cdh,'ID','.*')}")
             ],
             MYTRIPS_EDITING: [
-                CallbackQueryHandler(edit_property, pattern=f"^{ccd(cdh,'EDIT','(PRICE|SLOTS)')}$")
+                CallbackQueryHandler(edit_property, pattern=f"^{ccd(cdh,'EDIT','(PRICE|SLOTS|ORIGIN|DEST)')}$")
             ],
             MYTRIPS_CHANGING_SLOTS: [
                 CallbackQueryHandler(update_trip_property, pattern=f"^{ccd(cdh,'(1|2|3|4|5|6)')}$"),
@@ -421,6 +510,14 @@ def add_handlers(dispatcher):
             ],
             MYTRIPS_CHANGING_PRICE: [
                 CallbackQueryHandler(update_trip_property, pattern=f"^{ccd(cdh,'PRICE_DEFAULT')}$"),
+                MessageHandler(Filters.text & ~Filters.command, update_trip_property),
+            ],
+            MYTRIPS_CHANGING_ORIGIN: [
+                CallbackQueryHandler(update_trip_property, pattern=f"^{ccd(cdh,'ORIGIN_(DELETE|DEFAULT)')}$"),
+                MessageHandler(Filters.text & ~Filters.command, update_trip_property),
+            ],
+            MYTRIPS_CHANGING_DEST: [
+                CallbackQueryHandler(update_trip_property, pattern=f"^{ccd(cdh,'DEST_(DELETE|DEFAULT)')}$"),
                 MessageHandler(Filters.text & ~Filters.command, update_trip_property),
             ],
             MYTRIPS_CANCEL: [

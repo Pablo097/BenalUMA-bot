@@ -233,10 +233,13 @@ def trips_keyboard(trips_dict, command, ikbs_list=None, show_extra_param=True,
             time = trip['Time']
             slots = trip['Slots'] if show_extra_param and 'Slots' in trip else None
             fee = trip['Fee'] if show_extra_param and 'Fee' in trip else None
+            origin = trip['Origin'] if show_extra_param and 'Origin' in trip else None
+            dest = trip['Dest'] if show_extra_param and 'Dest' in trip else None
             passengers_list = trip['Passengers'] if show_passengers and 'Passengers' in trip else None
             string = format_trip_from_data(direction, date, time=time,
                                         slots=slots, fee=fee,
                                         passenger_ids=passengers_list,
+                                        origin=origin, dest=dest,
                                         is_abbreviated=True)
             keyboard.append([InlineKeyboardButton(string,
                         callback_data=ccd(cbd, direction[2:5].upper(), date, key))])

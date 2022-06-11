@@ -1,5 +1,6 @@
 import logging, re
 from data.database_api import (get_name, is_driver, get_slots, get_car,
+                               get_home, get_univ,
                                get_fee, get_bizum, get_trip,
                                get_trips_by_date_range, get_trips_by_driver,
                                get_trips_by_passenger,
@@ -59,7 +60,7 @@ def get_formatted_user_config(chat_id):
 
 def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
                           slots=None, car=None, fee=None, bizum=None,
-                          passenger_ids=None, is_abbreviated=False):
+                          passenger_ids=None, origin=None, dest=None, is_abbreviated=False):
     """Generates formatted string with the given trip data.
     All the parameters are optional.
     This function formats the data as it is passed.
@@ -85,6 +86,10 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         Driver's Bizum preference flag.
     passenger_ids : list of ints
         Telegram Chat IDs of the accepted passengers in the trip.
+    origin : str
+        Brief description of origin location.
+    dest : str
+        Brief description of destination location.
     is_abbreviated : boolean
         Flag to indicate whether to abbreviate the message, only using
         the emojis and writting all in one line, without Markdown.
@@ -102,6 +107,16 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
             fields.append(f"🧑 *Conductor*: {get_markdown2_inline_mention(chat_id)}")
         if direction:
             fields.append(f"📍 *Dirección*: `{dir_dict.get(direction, direction[2:])}`")
+        if origin and dest:
+            text_aux = f"🗺️ *Zonas*: 🚏`{escape_markdown(origin,2)}`"\
+                       f"→`{escape_markdown(dest,2)}`🏁"
+            fields.append(text_aux)
+        elif origin:
+            text_aux = f"🚏 *Origen*: `{escape_markdown(origin,2)}`"
+            fields.append(text_aux)
+        elif dest:
+            text_aux = f"🏁 *Destino*: `{escape_markdown(dest,2)}`"
+            fields.append(text_aux)
         if date:
             weekday = get_weekday_from_date(date)
             fields.append(f"📅 *Fecha*: `{weekday} {date[8:10]}/{date[5:7]}`")
@@ -130,6 +145,15 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
             fields.append(f"🧑 {get_name(chat_id)}")
         if direction:
             fields.append(f"📍 {dir_dict.get(direction, direction[2:])}")
+        if origin and dest:
+            text_aux = f"🚏{origin}→{dest}🏁"
+            fields.append(text_aux)
+        elif origin:
+            text_aux = f"🚏{origin}"
+            fields.append(text_aux)
+        elif dest:
+            text_aux = f"🏁{dest}"
+            fields.append(text_aux)
         if date:
             weekday = get_weekday_from_date(date)
             fields.append(f"📅 {weekday} {date[8:10]}")
@@ -138,7 +162,7 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         if slots:
             fields.append(f"💺 {str(slots)}")
         if car:
-            fields.append(f"🚘 {escape_markdown(car,2)}")
+            fields.append(f"🚘 {car}")
         if fee:
             fields.append(f"💰 {str(fee).replace('.',',')}€")
         if bizum != None:
@@ -149,6 +173,56 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         string = '  '.join(fields)
 
     return string
+
+def get_actual_origin(chat_id, direction):
+    """Gets the origin zone for a given driver and a direction of the trip,
+    from the default configuration data, if set.
+
+    Parameters
+    ----------
+    chat_id : int or str
+        The chat_id to check.
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+
+    Returns
+    -------
+    str
+        Brief description of origin location.
+        None if it is not configured in the driver's default configuration.
+
+    """
+    origin = None
+    if direction == list(dir_dict.keys())[0]:   # University
+        origin = get_home(chat_id)
+    elif direction == list(dir_dict.keys())[1]:   # Home
+        origin = get_univ(chat_id)
+    return origin
+
+def get_actual_dest(chat_id, direction):
+    """Gets the destination zone for a given driver and a direction of the trip,
+    from the default configuration data, if set.
+
+    Parameters
+    ----------
+    chat_id : int or str
+        The chat_id to check.
+    direction : string
+        Direction of the trip. Can be 'toBenalmadena' or 'toUMA'.
+
+    Returns
+    -------
+    str
+        Brief description of destination location.
+        None if it is not configured in the driver's default configuration.
+
+    """
+    dest = None
+    if direction == list(dir_dict.keys())[0]:   # University
+        dest = get_univ(chat_id)
+    elif direction == list(dir_dict.keys())[1]:   # Home
+        dest = get_home(chat_id)
+    return dest
 
 def get_formatted_trip_for_driver(direction, date, key):
     """Generates a formatted string with the trip information interesting
@@ -173,14 +247,19 @@ def get_formatted_trip_for_driver(direction, date, key):
     trip_dict = get_trip(direction, date, key)
 
     time = trip_dict['Time']
-    slots = trip_dict['Slots'] if 'Slots' in trip_dict else None
-    fee = trip_dict['Fee'] if 'Fee' in trip_dict else None
-    passengers_list = trip_dict['Passengers'] if 'Passengers' in trip_dict else None
+    slots = trip_dict.get('Slots')
+    fee = trip_dict.get('Fee')
+    passengers_list = trip_dict.get('Passengers')
     # if passengers_list and slots:
     #     slots -= len(passengers_list)
 
+    driver_id = trip_dict['Chat ID']
+    origin = trip_dict.get('Origin', get_actual_origin(driver_id, direction))
+    dest = trip_dict.get('Dest', get_actual_dest(driver_id, direction))
+
     return format_trip_from_data(direction, date, None, time, slots,
-                                fee=fee, passenger_ids=passengers_list)
+                                fee=fee, passenger_ids=passengers_list,
+                                origin=origin, dest=dest)
 
 def get_formatted_trip_for_passenger(direction, date, key, is_abbreviated=True):
     """Generates a formatted string with the trip information interesting
@@ -217,8 +296,11 @@ def get_formatted_trip_for_passenger(direction, date, key, is_abbreviated=True):
     if 'Passengers' in trip_dict:
         slots -= len(trip_dict['Passengers'])
 
+    origin = trip_dict.get('Origin', get_actual_origin(driver_id, direction))
+    dest = trip_dict.get('Dest', get_actual_dest(driver_id, direction))
+
     return format_trip_from_data(direction, date, driver_id, time,
-                                slots, car, fee, bizum)
+                                slots, car, fee, bizum, origin=origin, dest=dest)
 
 def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None):
     """Generates a formatted string with the offered trips in the
@@ -263,12 +345,18 @@ def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None
                 else:
                     fee = get_fee(trips_dict[key]['Chat ID'])
 
+                origin = trips_dict[key].get('Origin',
+                            get_actual_origin(trips_dict[key]['Chat ID'], direction))
+                dest = trips_dict[key].get('Dest',
+                            get_actual_dest(trips_dict[key]['Chat ID'], direction))
+
                 separator = escape_markdown("———————",2)
                 # separator = escape_markdown("‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ‎ ",2)
                 text = f"{separator} *Opción {str(index)}* {separator}\n"
                 text += format_trip_from_data(chat_id=trips_dict[key]['Chat ID'],
                                                 time=trips_dict[key]['Time'],
-                                                slots=slots, fee=fee)
+                                                slots=slots, fee=fee,
+                                                origin=origin, dest=dest)
                 string_list.append(text)
                 key_list.append(key)
                 index += 1
@@ -320,9 +408,15 @@ def get_formatted_trips_near_request(direction, date, time):
                 else:
                     fee = get_fee(trips_dict[key]['Chat ID'])
 
+                origin = trips_dict[key].get('Origin',
+                            get_actual_origin(trips_dict[key]['Chat ID'], direction))
+                dest = trips_dict[key].get('Dest',
+                            get_actual_dest(trips_dict[key]['Chat ID'], direction))
+
                 string_list.append(format_trip_from_data(chat_id=trips_dict[key]['Chat ID'],
                                                 time=trips_dict[key]['Time'],
-                                                slots=slots, fee=fee))
+                                                slots=slots, fee=fee,
+                                                origin=origin, dest=dest))
                 # key_list.append(key)
 
     if string_list:
@@ -494,12 +588,15 @@ def get_driver_week_formatted_trips(chat_id):
                 trip = trips_dict[date][key]
                 direction = trip['Direction']
                 time = trip['Time']
-                slots = trip['Slots'] if 'Slots' in trip else None
-                fee = trip['Fee'] if 'Fee' in trip else None
-                passengers_list = trip['Passengers'] if 'Passengers' in trip else None
+                slots = trip.get('Slots')
+                fee = trip.get('Fee')
+                passengers_list = trip.get('Passengers')
+                origin = trip.get('Origin', get_actual_origin(chat_id, direction))
+                dest = trip.get('Dest', get_actual_dest(chat_id, direction))
                 day_string_list.append(format_trip_from_data(direction,
                                             time=time, slots=slots, fee=fee,
-                                            passenger_ids=passengers_list))
+                                            passenger_ids=passengers_list,
+                                            origin=origin, dest=dest))
             week_string_list.append('\n\n'.join(day_string_list))
         string = '\n\n'.join(week_string_list)
 
@@ -547,11 +644,14 @@ def get_user_week_formatted_bookings(chat_id):
                     # the other passengers in their booked trips?
                 car = get_car(driver_id)
                 bizum = get_bizum(driver_id)
+                origin = trip.get('Origin', get_actual_origin(driver_id, direction))
+                dest = trip.get('Dest', get_actual_dest(driver_id, direction))
 
                 day_string_list.append(format_trip_from_data(direction,
                                             chat_id=driver_id, time=time,
                                             slots=slots, car=car,
-                                            fee=fee, bizum=bizum))
+                                            fee=fee, bizum=bizum,
+                                            origin=origin, dest=dest))
             week_string_list.append('\n\n'.join(day_string_list))
         string = '\n\n'.join(week_string_list)
 

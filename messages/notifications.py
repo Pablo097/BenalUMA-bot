@@ -20,14 +20,16 @@ from utils.common import *
 
 logger = logging.getLogger(__name__)
 
-def notify_new_trip(context, trip_key, direction, chat_id, date, time, slots=None, fee=None):
+def notify_new_trip(context, trip_key, direction, chat_id, date, time,
+                        slots=None, fee=None, origin=None, dest=None):
     if not slots:
         slots = get_slots(chat_id)
     if not fee:
         fee = get_fee(chat_id)
 
     text = "🔵 Se ha publicado un *nuevo viaje*:\n\n"
-    text += format_trip_from_data(direction, date, chat_id, time, slots, fee=fee)
+    text += format_trip_from_data(direction, date, chat_id, time, slots,
+                                        fee=fee, origin=origin, dest=dest)
     text += f"\n\nPuedes ver todos los viajes ofertados mediante"\
            f" el comando /verofertas\. Si estás interesado en este viaje"\
            f" puedes mandar una solicitud de reserva desde este mensaje:"
@@ -78,6 +80,8 @@ def delete_trip_notify(update, context, direction, date, key):
     passenger_ids = get_trip_passengers(direction, date, key)
 
     if passenger_ids:
+        text_driver = f"Avisando a los pasajeros..."
+        send_message(context, update.effective_chat.id, text_driver)
         text_passenger = f"🚫 El siguiente viaje, en el que te habían "\
                          f"aceptado como pasajero, ha sido anulado:\n\n"
         text_passenger = escape_markdown(text_passenger,2)

@@ -416,7 +416,9 @@ def reserve_from_notification(update, context):
 
     if data[1]=='DISMISS':
         query.answer()
-        query.edit_message_reply_markup()
+        # query.edit_message_reply_markup()
+        text = query.message.text
+        query.edit_message_text(text[:text.rfind('.')+1], entities=query.message.entities)
         return ConversationHandler.END
 
     dir, date = data[1:3]

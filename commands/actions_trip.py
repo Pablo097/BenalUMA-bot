@@ -3,8 +3,10 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
-from data.database_api import add_trip, get_fee, get_slots, get_request_time
-from messages.format import format_trip_from_data, get_formatted_trip_for_driver
+from data.database_api import (add_trip, get_fee, get_slots, get_request_time,
+                                get_home, get_univ)
+from messages.format import (format_trip_from_data, get_formatted_trip_for_driver,
+                            get_actual_origin, get_actual_dest)
 from messages.notifications import notify_new_trip
 from utils.keyboards import weekdays_keyboard, seats_keyboard
 from utils.time_picker import (time_picker_keyboard, process_time_callback)
@@ -12,8 +14,8 @@ from utils.common import *
 from utils.decorators import registered, driver
 
 # 'New trip' conversation points
-(TRIP_START, TRIP_DATE, TRIP_HOUR, TRIP_SELECT_MORE,
-                TRIP_CHANGING_SLOTS, TRIP_CHANGING_PRICE) = range(6)
+(TRIP_START, TRIP_DATE, TRIP_HOUR, TRIP_SELECT_MORE, TRIP_CHANGING_SLOTS,
+    TRIP_CHANGING_PRICE, TRIP_CHANGING_ORIGIN, TRIP_CHANGING_DEST) = range(8)
 cdh = "NT"   # Callback Data Header
 
 # Abort/Cancel buttons
@@ -94,21 +96,28 @@ def send_select_more_message(update, context):
     dir = context.user_data['trip_dir']
     date = context.user_data['trip_date']
     time = context.user_data['trip_time']
-    slots = context.user_data['trip_slots'] if 'trip_slots' in context.user_data else None
-    price = context.user_data['trip_price'] if 'trip_price' in context.user_data else None
+    slots = context.user_data.get('trip_slots', None)
+    price = context.user_data.get('trip_price', None)
+    origin = context.user_data.get('trip_origin',
+                            get_actual_origin(update.effective_chat.id, dir))
+    dest = context.user_data.get('trip_dest',
+                            get_actual_dest(update.effective_chat.id, dir))
 
-    keyboard = [[InlineKeyboardButton("Configurar asientos", callback_data=ccd(cdh,"SLOTS"))],
-                [InlineKeyboardButton("Configurar precio", callback_data=ccd(cdh,"PRICE"))],
+    keyboard = [[InlineKeyboardButton("💰 Precio", callback_data=ccd(cdh,"PRICE")),
+                 InlineKeyboardButton("💺 Asientos", callback_data=ccd(cdh,"SLOTS"))],
+                [InlineKeyboardButton("🚏 Origen", callback_data=ccd(cdh,"ORIGIN")),
+                 InlineKeyboardButton("🏁 Destino", callback_data=ccd(cdh,"DEST"))],
                 [ikbs_abort_trip[0][0],
                  InlineKeyboardButton("✅ Terminar", callback_data=ccd(cdh,"DONE"))]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     text = f"Tu viaje se publicará con los siguientes datos:\n\n"
     text = escape_markdown(text, 2)
-    text += format_trip_from_data(dir, date, time=time, slots=slots, fee=price)
-    text2 = f"\n\nPuedes especificar los asientos disponibles y/o el precio"\
-            f" para este viaje en particular si lo deseas. Si no, se usarán"\
-            f" los valores por defecto de tu configuración de conductor."
+    text += format_trip_from_data(dir, date, time=time, slots=slots, fee=price,
+                                            origin=origin, dest=dest)
+    text2 = f"\n\nPuedes especificar cualquiera de los datos de abajo para este"\
+            f" viaje en particular si lo deseas. Si no, se usarán los valores"\
+            f" por defecto de tu configuración de conductor."
     text += escape_markdown(text2, 2)
 
     if update.callback_query:
@@ -164,6 +173,7 @@ def selecting_more(update, context):
             ikbs_list=[[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'SLOTS_DEFAULT'))]])
 
         text = "¿Cuántos asientos disponibles quieres ofertar para este viaje?"
+        text = escape_markdown(text,2)
         context.user_data['trip_setting'] = 'slots'
         next_state = TRIP_CHANGING_SLOTS
     elif data[1] == 'PRICE':
@@ -174,10 +184,65 @@ def selecting_more(update, context):
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         text = f"Escribe el precio por pasajero para este trayecto (máximo {str(MAX_FEE).replace('.',',')}€)."
+        text = escape_markdown(text,2)
         context.user_data['trip_setting'] = 'price'
         next_state = TRIP_CHANGING_PRICE
+    elif data[1] == 'ORIGIN':
+        dir = context.user_data['trip_dir']
+        if dir==list(dir_dict.keys())[0]:       # University
+            origin = get_home(update.effective_chat.id)
+            eg_list = home_examples_list
+            dir_str = dir_dict2[list(dir_dict.keys())[1]]
+        elif dir==list(dir_dict.keys())[1]:     # Home
+            origin = get_univ(update.effective_chat.id)
+            eg_list = univ_examples_list
+            dir_str = dir_dict2[list(dir_dict.keys())[0]]
 
-    query.edit_message_text(text=text, reply_markup=reply_markup)
+        text = f"Escribe una breve descripción de la *zona de la que vas a salir*\."\
+               f" Por ejemplo: `{'`, `'.join([escape_markdown(aux,2) for aux in eg_list])}`"\
+               f", etc\. \(Máximo {MAX_LOC_CHARS} caracteres\)"
+        # If origin has a default value, give option to use it
+        if origin:
+            text_default = f"Usar origen por defecto ({escape_markdown(origin,2)})"
+            keyboard = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'ORIGIN_DEFAULT'))]]
+        else:
+            text += f"\n\nRecuerda que puedes configurar una zona de {dir_str} por"\
+                    f" defecto desde el comando /config, que los usuarios verán"\
+                    f" en todos tus viajes para los que no hayas concretado una distinta\."
+            keyboard = [[InlineKeyboardButton("Borrar", callback_data=ccd(cdh,'ORIGIN_DELETE'))]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.user_data['trip_setting'] = 'origin'
+        next_state = TRIP_CHANGING_ORIGIN
+    elif data[1] == 'DEST':
+        dir = context.user_data['trip_dir']
+        dir_str = dir_dict2[dir]
+        if dir==list(dir_dict.keys())[0]:       # University
+            dest = get_univ(update.effective_chat.id)
+            eg_list = univ_examples_list
+        elif dir==list(dir_dict.keys())[1]:     # Home
+            dest = get_home(update.effective_chat.id)
+            eg_list = home_examples_list
+
+        text = f"Escribe una breve descripción de la *zona a la que vas a ir*\."\
+               f" Por ejemplo: `{'`, `'.join([escape_markdown(aux,2) for aux in eg_list])}`"\
+               f", etc\. \(Máximo {MAX_LOC_CHARS} caracteres\)"
+        # If destination has a default value, give option to use it
+        if dest:
+            text_default = f"Usar destino por defecto ({escape_markdown(dest,2)})"
+            keyboard = [[InlineKeyboardButton(text_default, callback_data=ccd(cdh,'DEST_DEFAULT'))]]
+        else:
+            text += f"\n\nRecuerda que puedes configurar una zona de {dir_str} por"\
+                    f" defecto desde el comando /config, que los usuarios verán"\
+                    f" en todos tus viajes para los que no hayas concretado una distinta\."
+            keyboard = [[InlineKeyboardButton("Borrar", callback_data=ccd(cdh,'DEST_DELETE'))]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.user_data['trip_setting'] = 'dest'
+        next_state = TRIP_CHANGING_DEST
+
+    query.edit_message_text(text=text, reply_markup=reply_markup,
+                                    parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return next_state
 
 def update_trip_setting(update, context):
@@ -224,6 +289,28 @@ def update_trip_setting(update, context):
                 context.user_data['trip_price'] = price
         elif data[1] == "PRICE_DEFAULT":
             context.user_data.pop('trip_price', None)
+    elif setting == 'origin':
+        if not is_query:
+            # Remove possible inline keyboard from previous message
+            if 'trip_message' in context.user_data:
+                sent_message = context.user_data.pop('trip_message')
+                sent_message.edit_reply_markup(None)
+            # Obtain origin, limiting characters
+            origin = update.message.text[:20].capitalize()
+            context.user_data['trip_origin'] = origin
+        elif data[1] == "ORIGIN_DEFAULT" or data[1] == "ORIGIN_DELETE":
+            context.user_data.pop('trip_origin', None)
+    elif setting == 'dest':
+        if not is_query:
+            # Remove possible inline keyboard from previous message
+            if 'trip_message' in context.user_data:
+                sent_message = context.user_data.pop('trip_message')
+                sent_message.edit_reply_markup(None)
+            # Obtain destination, limiting characters
+            dest = update.message.text[:20].capitalize()
+            context.user_data['trip_dest'] = dest
+        elif data[1] == "DEST_DEFAULT" or data[1] == "DEST_DELETE":
+            context.user_data.pop('trip_dest', None)
 
     send_select_more_message(update, context)
     return TRIP_SELECT_MORE
@@ -237,13 +324,17 @@ def publish_trip(update, context):
     time = context.user_data.pop('trip_time')
     slots = context.user_data.pop('trip_slots', None)
     price = context.user_data.pop('trip_price', None)
-    trip_key = add_trip(dir, update.effective_chat.id, date, time, slots, price)
+    origin = context.user_data.pop('trip_origin', None)
+    dest = context.user_data.pop('trip_dest', None)
+    trip_key = add_trip(dir, update.effective_chat.id, date, time, slots,
+                                                        price, origin, dest)
 
     text = escape_markdown("Perfecto. ¡Tu viaje se ha publicado!\n\n",2)
     text += get_formatted_trip_for_driver(dir, date, trip_key)
     query.edit_message_text(text=text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
 
-    notify_new_trip(context, trip_key, dir, update.effective_chat.id, date, time, slots, price)
+    notify_new_trip(context, trip_key, dir, update.effective_chat.id, date,
+                            time, slots, price, origin, dest)
 
     for key in list(context.user_data.keys()):
         if key.startswith('trip_'):
@@ -282,7 +373,7 @@ def add_handlers(dispatcher):
                 MessageHandler(Filters.text & ~Filters.command, select_more),
             ],
             TRIP_SELECT_MORE: [
-                CallbackQueryHandler(selecting_more, pattern=f"^{ccd(cdh,'(SLOTS|PRICE)')}$"),
+                CallbackQueryHandler(selecting_more, pattern=f"^{ccd(cdh,'(SLOTS|PRICE|ORIGIN|DEST)')}$"),
                 CallbackQueryHandler(publish_trip, pattern=f"^{ccd(cdh,'DONE')}$"),
             ],
             TRIP_CHANGING_SLOTS: [
@@ -292,7 +383,15 @@ def add_handlers(dispatcher):
             TRIP_CHANGING_PRICE: [
                 CallbackQueryHandler(update_trip_setting, pattern=f"^{ccd(cdh,'PRICE_DEFAULT')}$"),
                 MessageHandler(Filters.text & ~Filters.command, update_trip_setting),
-            ]
+            ],
+            TRIP_CHANGING_ORIGIN: [
+                CallbackQueryHandler(update_trip_setting, pattern=f"^{ccd(cdh,'ORIGIN_(DELETE|DEFAULT)')}$"),
+                MessageHandler(Filters.text & ~Filters.command, update_trip_setting),
+            ],
+            TRIP_CHANGING_DEST: [
+                CallbackQueryHandler(update_trip_setting, pattern=f"^{ccd(cdh,'DEST_(DELETE|DEFAULT)')}$"),
+                MessageHandler(Filters.text & ~Filters.command, update_trip_setting),
+            ],
         },
         fallbacks=[CallbackQueryHandler(trip_abort, pattern=f"^{ccd(cdh,'ABORT')}$"),
                    CommandHandler('nuevoviaje', new_trip)],
