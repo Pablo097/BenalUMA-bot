@@ -63,4 +63,4 @@ You can also directly contact me if you detect bugs or have any idea for improve
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
+[GPL 3.0](https://choosealicense.com/licenses/gpl-3.0/)
