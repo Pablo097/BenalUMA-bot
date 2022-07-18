@@ -87,10 +87,43 @@ def broadcast(update, context):
     # message = ' '.join(context.args)
     message = update.message.text.split(" ",1)[1]
     send_message(context, get_all_chat_ids(), message)
-    
+
+    return
+
+@admin
+def dm(update, context):
+    """Send a Direct Message to a user given its chat ID or telegram username
+    as a command parameter"""
+    if not context.args or len(context.args)<2:
+        text = "Sintaxis incorrecta\. Uso: `/dm <user_id/@username\> <message\>`"
+        update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
+        return
+
+    user_id = context.args[0]
+    if user_id[0]=='@':     # If the Telegram username is given
+        username = user_id
+        # Trust that the user has not changed its Telegram username since
+        # the registration...
+        user_id = get_chat_id_from_tg_username(username)
+        if not user_id:
+            text = f"No se ha encontrado ningún usuario registrado con este"\
+                   f" nombre de usuario."
+            update.message.reply_text(text)
+            return
+    elif not is_registered(user_id):
+        text = "No se ha encontrado ningún usuario registrado con este ID."
+        update.message.reply_text(text)
+        return
+
+    message = update.message.text.split(" ",2)[2]
+    send_message(context, user_id, message, notify_id=update.effective_chat.id)
+
+    text = f"Enviando mensaje a usuario con ID `{user_id}`\."
+    update.message.reply_text(text, parse_mode=telegram.ParseMode.MARKDOWN_V2)
     return
 
 def add_handlers(dispatcher):
     dispatcher.add_handler(CommandHandler("ban", ban))
     dispatcher.add_handler(CommandHandler("unban", unban))
     dispatcher.add_handler(CommandHandler("broadcast", broadcast))
+    dispatcher.add_handler(CommandHandler("dm", dm))
