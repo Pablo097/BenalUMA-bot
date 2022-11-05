@@ -1,6 +1,6 @@
 # BenalUMA Bot
 
-**BenalUMA Bot** is a Telegram bot written in Python and built on the [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) API (v13.11). It is deployed in Heroku and is supported by a Google Firebase Database. 
+**BenalUMA Bot** is a Telegram bot written in Python and built on the [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) API (v13.11). It is deployed in Render (previously in Heroku) and is supported by a Google Firebase Database. 
 
 The purpose of this bot is to maintain car sharing tasks within a community of people (mostly students) from Benalmádena (Spain) that usually go to the University of Málaga. The bot itself can be found at [@BenalUMA_bot](https://t.me/BenalUMA_bot).
 ## Run Locally
