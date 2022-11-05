@@ -127,7 +127,7 @@ def main(webhook_flag = True):
             listen="0.0.0.0",
             port=int(PORT),
             url_path=TOKEN,
-            webhook_url=f"https://{NAME}.herokuapp.com/{TOKEN}"
+            webhook_url=f"https://{NAME}.onrender.com/{TOKEN}"
         )
     else:
         # For local development purposes
