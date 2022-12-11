@@ -1,6 +1,6 @@
 import logging, re
 from data.database_api import (get_name, is_driver, get_slots, get_car,
-                               get_home, get_univ,
+                               get_home, get_univ, get_phone,
                                get_fee, get_bizum, get_trip,
                                get_trips_by_date_range, get_trips_by_driver,
                                get_trips_by_passenger,
@@ -48,6 +48,9 @@ def get_formatted_user_config(chat_id):
         #     string += f"\n💳🚫 `NO aceptas Bizum`"
         if bizum != None:
             string += f"\n💳 *Bizum*: `{'P' if bizum else '🚫 NO p'}ermitido`"
+            phone = get_phone(chat_id)
+            if phone:
+                string += f" `({phone})`"
         univ_name, home_name = list(dir_dict.values())
         home = get_home(chat_id)
         if home != None:
@@ -59,7 +62,7 @@ def get_formatted_user_config(chat_id):
     return string
 
 def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
-                          slots=None, car=None, fee=None, bizum=None,
+                          slots=None, car=None, fee=None, bizum=None, phone=None,
                           passenger_ids=None, origin=None, dest=None, is_abbreviated=False):
     """Generates formatted string with the given trip data.
     All the parameters are optional.
@@ -84,6 +87,8 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         The per-user payment quantity.
     bizum : boolean
         Driver's Bizum preference flag.
+    phone : str
+        Driver's Bizum phone number.
     passenger_ids : list of ints
         Telegram Chat IDs of the accepted passengers in the trip.
     origin : str
@@ -135,7 +140,10 @@ def format_trip_from_data(direction=None, date=None, chat_id=None, time=None,
         if fee:
             fields.append(f"💰 *Precio*: `{str(fee).replace('.',',')}€`")
         if bizum != None:
-            fields.append(f"💳 *Bizum*: `{'Aceptado' if bizum else 'NO aceptado'}`")
+            str_aux = f"💳 *Bizum*: `{'Aceptado' if bizum else 'NO aceptado'}`"
+            if bizum and phone:
+                str_aux += f" `({phone})`"
+            fields.append(str_aux)
         if passenger_ids:
             passenger_strings = [get_markdown2_inline_mention(id) for id in passenger_ids]
             fields.append(f"👥 *Pasajeros aceptados*: {', '.join(passenger_strings)}")
@@ -293,6 +301,7 @@ def get_formatted_trip_for_passenger(direction, date, key, is_abbreviated=True):
     fee = trip_dict['Fee'] if 'Fee' in trip_dict else get_fee(driver_id)
     car = get_car(driver_id) if not is_abbreviated else None
     bizum = get_bizum(driver_id) if not is_abbreviated else None
+    phone = get_phone(driver_id) if not is_abbreviated else None
     if 'Passengers' in trip_dict:
         slots -= len(trip_dict['Passengers'])
 
@@ -300,7 +309,7 @@ def get_formatted_trip_for_passenger(direction, date, key, is_abbreviated=True):
     dest = trip_dict.get('Dest', get_actual_dest(driver_id, direction))
 
     return format_trip_from_data(direction, date, driver_id, time,
-                                slots, car, fee, bizum, origin=origin, dest=dest)
+                                slots, car, fee, bizum, phone, origin=origin, dest=dest)
 
 def get_formatted_offered_trips(direction, date, time_start=None, time_stop=None):
     """Generates a formatted string with the offered trips in the
@@ -644,13 +653,14 @@ def get_user_week_formatted_bookings(chat_id):
                     # the other passengers in their booked trips?
                 car = get_car(driver_id)
                 bizum = get_bizum(driver_id)
+                phone = get_phone(driver_id)
                 origin = trip.get('Origin', get_actual_origin(driver_id, direction))
                 dest = trip.get('Dest', get_actual_dest(driver_id, direction))
 
                 day_string_list.append(format_trip_from_data(direction,
                                             chat_id=driver_id, time=time,
                                             slots=slots, car=car,
-                                            fee=fee, bizum=bizum,
+                                            fee=fee, bizum=bizum, phone=phone,
                                             origin=origin, dest=dest))
             week_string_list.append('\n\n'.join(day_string_list))
         string = '\n\n'.join(week_string_list)

@@ -1,9 +1,10 @@
 import logging, telegram, re
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, Update,
+                      KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                         ConversationHandler, CallbackContext, CallbackQueryHandler)
 from telegram.utils.helpers import escape_markdown
-from data.database_api import (is_registered, is_driver, set_name, set_car,
+from data.database_api import (is_registered, is_driver, set_name, set_car, set_phone,
                                 set_slots, set_bizum, set_fee, add_driver,
                                 set_home, set_univ,
                                 modify_offer_notification, modify_request_notification)
@@ -15,7 +16,7 @@ from utils.common import *
 from utils.decorators import registered
 
 (CONFIG_SELECT, CONFIG_SELECT_ADVANCED, CHANGING_MESSAGE, CHANGING_SLOTS,
-    CHANGING_BIZUM, CHANGING_LOCATION, CHOOSING_ADVANCED_OPTION) = range(7)
+    CHANGING_BIZUM, CHANGING_PHONE, CHANGING_LOCATION, CHOOSING_ADVANCED_OPTION) = range(8)
 cdh = 'CONFIG'   # Callback Data Header
 
 # Back button
@@ -233,6 +234,27 @@ def update_user_property(update, context):
     elif option == 'car':
         set_car(update.effective_chat.id, update.message.text)
         text = f"Descripción del vehículo actualizada correctamente."
+    elif option == 'phone':
+        if update.message.text == "No compartir":
+            text = f"Tu número de teléfono no se compartirá."
+        else:
+            phone = None
+            if update.message.contact:
+                phone = update.message.contact.phone_number
+            else:
+                phone_regex = "[+]?[\s0-9]{6,}"
+                re_match = re.search(phone_regex, update.message.text)
+                if re_match:
+                    phone = re_match[0].replace(" ","")
+                else:
+                    text = f"No se ha guardado ningún número de teléfono ya que"\
+                           f" no se ha detectado ninguno válido."
+            if phone:
+                set_phone(update.effective_chat.id, phone)
+                text = f"Número de teléfono guardado correctamente. ({phone})"
+        msg_aux = update.message.reply_text("Eliminando teclado anterior...",
+                                            reply_markup=ReplyKeyboardRemove())
+        msg_aux.delete()
     elif option == 'fee':
         try:
             fee = obtain_float_from_string(update.message.text)
@@ -262,7 +284,7 @@ def update_user_property(update, context):
 
     reply_markup = config_keyboard(update.effective_chat.id)
     text = escape_markdown(text, 2)
-    text += f"\n\n Esta es tu configuración actual: \n"
+    text += f"\n\nEsta es tu configuración actual: \n"
     text += get_formatted_user_config(update.effective_chat.id)
     text += f"\n\nPuedes seguir cambiando ajustes\."
     context.user_data['config_message'] = update.message.reply_text(text,
@@ -285,7 +307,26 @@ def update_user_property_callback(update, context):
     elif option == 'bizum':
         bizum_flag = True if data[1]=="YES" else False
         set_bizum(update.effective_chat.id, bizum_flag)
+        set_phone(update.effective_chat.id, None)
         text = f"Preferencia de Bizum modificada correctamente."
+        if bizum_flag:
+            query.edit_message_text(text)
+            context.user_data['config_option'] = 'phone'
+            context.user_data.pop('config_message')
+            text = f"\n\nAhora puedes darme acceso a tu número de teléfono "\
+                   f"para que pueda mostrárselo a los pasajeros que aceptes y "\
+                   f"puedan hacerte Bizum fácilmente.\n\n"\
+                   f"Si usas un número de teléfono distinto para Bizum, también "\
+                   f"puedes simplemente escribirlo y mandármelo como un mensaje.\n\n"\
+                   f"También puedes elegir no dármelo, pero en ese caso tendrás "\
+                   f"que facilitarle tu número individualmente a cada pasajero "\
+                   f"que quiera hacerte Bizum."
+            reply_keyboard = [[KeyboardButton("Compartir mi número", request_contact=True)],
+                             ["No compartir"]]
+            reply_markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True,
+                        input_field_placeholder='O escribe un teléfono diferente...')
+            update.effective_message.reply_text(text, reply_markup=reply_markup)
+            return CHANGING_PHONE
     elif option == 'home':
         if data[1] == 'DELETE':
             set_home(update.effective_chat.id)
@@ -329,7 +370,7 @@ def update_user_property_callback(update, context):
 
     reply_markup = config_keyboard(update.effective_chat.id)
     text = escape_markdown(text, 2)
-    text += f"\n\n Esta es tu configuración actual: \n"
+    text += f"\n\nEsta es tu configuración actual: \n"
     text += get_formatted_user_config(update.effective_chat.id)
     text += f"\n\nPuedes seguir cambiando ajustes\."
     query.edit_message_text(text, reply_markup=reply_markup,
@@ -377,6 +418,9 @@ def add_handlers(dispatcher):
             ],
             CHANGING_BIZUM: [
                 CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'(YES|NO)')}$")
+            ],
+            CHANGING_PHONE: [
+                MessageHandler((Filters.text & ~Filters.command) | Filters.contact, update_user_property),
             ],
             CHANGING_LOCATION: [
                 CallbackQueryHandler(update_user_property_callback, pattern=f"^{ccd(cdh,'DELETE')}$"),

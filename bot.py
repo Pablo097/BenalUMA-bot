@@ -118,7 +118,7 @@ def main(webhook_flag = True):
     # Add notifications actions
     actions_notifications.add_handlers(dp)
 
-    # on noncommand i.e message - echo the message on Telegram
+    # Default handler when no coherent text is received
     dp.add_handler(MessageHandler(Filters.text, text_handler))
 
     # Start the Bot

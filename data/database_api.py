@@ -457,6 +457,45 @@ def set_bizum(chat_id, bizum_pref):
     else:
         ref.update({"Bizum": "No"})
 
+def get_phone(chat_id):
+    """Gets the phone number of a driver.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id to check.
+
+    Returns
+    -------
+    str
+        Phone number.
+
+    """
+
+    ref = db.reference(f"/Drivers/{str(chat_id)}")
+    return ref.child('Phone').get()
+
+def set_phone(chat_id, phone):
+    """Sets the phone number of a driver.
+
+    Parameters
+    ----------
+    chat_id : int or string
+        The chat_id of the driver.
+    phone : str
+        Phone number. If None, this field is deleted.
+
+    Returns
+    -------
+    None
+
+    """
+    ref = db.reference(f"/Drivers/{str(chat_id)}/Phone")
+    if phone:
+        ref.set(phone)
+    else:
+        ref.delete()
+
 def get_home(chat_id):
     """Gets the description of the location from where the driver usually
     starts their trips in the home town.
